@@ -1,36 +1,44 @@
-import React, { useEffect } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useSaldo } from "./_layout";
+import React, { useRef } from "react";
+import {
+  Animated,
+  StyleSheet,
+  TouchableOpacity,
+  View
+} from "react-native";
 
 export default function HomeScreen() {
-  const { metas, setMetas, metaAtivaId } = useSaldo();
-  const metaAtiva = metas.find((m) => m.id === metaAtivaId);
-  const guardado = metaAtiva ? metaAtiva.valorGuardado : 0;
-  const total = metaAtiva ? metaAtiva.valorTotal : 0;
+  const marteloY = useRef(new Animated.Value(-150)).current;
+  const porquinhoShake = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    if (total > 0 && guardado >= total) {
-      Alert.alert("Sucesso!", "Você atingiu sua meta!");
-    }
-  }, [guardado, total]);
-
-  const realizarDeposito = (valor: number) => {
-    if (!metaAtivaId) return Alert.alert("Erro", "Crie uma meta!");
-
-    const novasMetas = metas.map((m) =>
-      m.id === metaAtivaId
-        ? { ...m, valorGuardado: m.valorGuardado + valor }
-        : m,
-    );
-    setMetas(novasMetas);
+  const rodarAnimacao = () => {
+    Animated.sequence([
+      Animated.timing(marteloY, {
+        toValue: 20,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(porquinhoShake, {
+        toValue: 10,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+    ]).start(() => marteloY.setValue(-150));
   };
 
   return (
     <View style={styles.container}>
-      <Text>Meta: {metaAtiva?.nome || "Nenhuma"}</Text>
-      <Text>Guardado: R$ {guardado.toFixed(2)}</Text>
-      <TouchableOpacity onPress={() => realizarDeposito(10)} style={styles.btn}>
-        <Text>Depositar R$ 10</Text>
+      <Animated.View
+        style={[styles.martelo, { transform: [{ translateY: marteloY }] }]}
+      />
+      <Animated.View
+        style={[
+          styles.porquinho,
+          { transform: [{ translateX: porquinhoShake }] },
+        ]}
+      />
+
+      <TouchableOpacity onPress={rodarAnimacao} style={styles.btn}>
+        <Text>Testar Martelo</Text>
       </TouchableOpacity>
     </View>
   );
@@ -38,5 +46,18 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center" },
-  btn: { backgroundColor: "#6c5ce7", padding: 20, marginTop: 10 },
+  martelo: {
+    width: 50,
+    height: 40,
+    backgroundColor: "red",
+    position: "absolute",
+    top: 100,
+  },
+  porquinho: {
+    width: 100,
+    height: 80,
+    backgroundColor: "pink",
+    borderRadius: 40,
+  },
+  btn: { marginTop: 300 },
 });
