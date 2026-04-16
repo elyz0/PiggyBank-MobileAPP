@@ -58,97 +58,6 @@ function StatCard({ emoji, label, value, accent, isDark }: any) {
   );
 }
 
-// ─── Meta Progress Card ───────────────────────────────────────────────────────
-
-function MetaProgressCard({
-  nome,
-  emoji,
-  guardado,
-  total,
-  onPress,
-  isDark,
-}: any) {
-  const progresso = total > 0 ? Math.min(guardado / total, 1) : 0;
-  const pct = Math.round(progresso * 100);
-  const falta = Math.max(total - guardado, 0);
-
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.metaCard,
-        isDark ? styles.bgDarkCard : styles.bgLight,
-        pressed && styles.metaCardPressed,
-      ]}
-      onPress={onPress}
-    >
-      <View style={styles.metaCardHeader}>
-        <View
-          style={[
-            styles.metaEmojiWrap,
-            isDark && { backgroundColor: "#1E293B" },
-          ]}
-        >
-          <Text style={styles.metaEmoji}>{emoji ?? "🎯"}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text
-            style={[
-              styles.metaNome,
-              isDark ? styles.textWhite : styles.textBlack,
-            ]}
-            numberOfLines={1}
-          >
-            {nome}
-          </Text>
-          <Text
-            style={[
-              styles.metaFalta,
-              isDark ? styles.textMutedDark : styles.textMutedLight,
-            ]}
-          >
-            Faltam {formatCurrency(falta)}
-          </Text>
-        </View>
-        <View
-          style={[styles.pctBadge, isDark && { backgroundColor: "#1E293B" }]}
-        >
-          <Text style={styles.pctText}>{pct}%</Text>
-        </View>
-      </View>
-
-      <View
-        style={[styles.progressBg, isDark && { backgroundColor: "#334155" }]}
-      >
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${pct}%` },
-            pct >= 100 && styles.progressComplete,
-          ]}
-        />
-      </View>
-
-      <View style={styles.metaValoresRow}>
-        <Text style={styles.metaValorLabel}>Guardado</Text>
-        <Text style={styles.metaValorLabel}>Meta</Text>
-      </View>
-      <View style={styles.metaValoresRow}>
-        <Text
-          style={[
-            styles.metaValorNum,
-            isDark ? styles.textWhite : styles.textBlack,
-          ]}
-        >
-          {formatCurrency(guardado)}
-        </Text>
-        <Text style={[styles.metaValorNum, { color: "#94A3B8" }]}>
-          {formatCurrency(total)}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
 function MetaCarouselCard({
   nome,
   guardado,
@@ -209,12 +118,13 @@ export default function HomeScreen() {
 
   // Animated.Value estático para o Piggy (sem animação ativa aqui)
   const piggyScale = useRef(new Animated.Value(1)).current;
+  // Um pouco menor para caber com acessórios dentro do card
+  const piggyScaleCard = useRef(new Animated.Value(0.9)).current;
 
   const {
     pontos,
     ofensiva,
     metas,
-    metaAtivaId,
     ultimoDeposito,
     setOfensiva,
     chapeuEquipado,
@@ -243,8 +153,6 @@ export default function HomeScreen() {
     ).length;
     return { totalGuardado: tg, totalMeta: tm, metasCompletas: mc };
   }, [metas]);
-
-  const metaAtiva = (metas || []).find((m) => m.id === metaAtivaId) ?? null;
 
   return (
     <View
@@ -343,7 +251,7 @@ export default function HomeScreen() {
                   total={item.valorMeta}
                   isDark={isDark}
                   onPress={() => router.push("/objetivo")}
-                  piggyScale={piggyScale}
+                  piggyScale={piggyScaleCard}
                   chapeuEquipado={chapeuEquipado}
                 />
               )}
@@ -595,14 +503,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
+    overflow: "visible",
   },
   carouselPiggyWrap: {
-    height: 108,
+    height: 132,
     borderRadius: 16,
     backgroundColor: "#F5EDFF",
     alignItems: "center",
     justifyContent: "center",
+    paddingTop: 12,
     marginBottom: 10,
+    overflow: "visible",
   },
   carouselPiggyWrapDark: { backgroundColor: "#312E4B" },
   carouselNome: { fontSize: 15, fontWeight: "800" },
