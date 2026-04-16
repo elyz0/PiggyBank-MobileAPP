@@ -403,15 +403,7 @@ export default function ObjetivosScreen() {
       ]).start();
     });
 
-    const shouldAutoDismiss = !payload.excedente || payload.excedente <= 0;
-    const dismissAfterMs = shouldAutoDismiss ? 2800 : 10000;
-
-    celebracaoTimeoutRef.current = setTimeout(() => {
-      setCelebracaoVisivel(false);
-      setCelebracaoPayload(null);
-      celebracaoAnim.setValue(0);
-      burstAnim.setValue(0);
-    }, dismissAfterMs);
+    // Não auto-fechar: o usuário coleta os pontos via botão do overlay.
   };
 
   const depositar = async (meta: Meta) => {
@@ -717,6 +709,7 @@ export default function ObjetivosScreen() {
                           <View
                             style={[
                               styles.statusBadge,
+                              styles.statusBadgeStatus,
                               meta.status === "concluida"
                                 ? styles.statusConcluida
                                 : meta.status === "vencida"
@@ -724,7 +717,7 @@ export default function ObjetivosScreen() {
                                   : styles.statusAndamento,
                             ]}
                           >
-                            <Text style={[styles.badgeText, { color: theme.textPrimary }]} numberOfLines={1}>
+                            <Text style={[styles.badgeText, { color: theme.textPrimary }]} numberOfLines={2}>
                               {statusLabel}
                             </Text>
                           </View>
@@ -732,6 +725,7 @@ export default function ObjetivosScreen() {
                           <View
                             style={[
                               styles.statusBadge,
+                              styles.statusBadgeDate,
                               meta.status === "concluida"
                                 ? styles.statusConcluida
                                 : meta.status === "vencida"
@@ -991,13 +985,9 @@ export default function ObjetivosScreen() {
                   onPress={() => {
                     setCelebracaoVisivel(false);
                     setCelebracaoPayload(null);
-                    setNomeNovaMeta(`Excedente da ${celebracaoPayload.nome}`);
-                    setValorMetaInput(String(celebracaoPayload.excedente));
-                    setDataPrazoInput(celebracaoPayload.dataPrazo);
-                    setAbrirModalCriar(true);
                   }}
                 >
-                  <Text style={styles.celebracaoBtnText}>Criar nova meta</Text>
+                  <Text style={styles.celebracaoBtnText}>Coletar pontos</Text>
                 </Pressable>
 
                 <Pressable
@@ -1005,12 +995,30 @@ export default function ObjetivosScreen() {
                   onPress={() => {
                     setCelebracaoVisivel(false);
                     setCelebracaoPayload(null);
+                    setNomeNovaMeta(`Excedente da ${celebracaoPayload.nome}`);
+                    setValorMetaInput(String(celebracaoPayload.excedente));
+                    setDataPrazoInput(celebracaoPayload.dataPrazo);
+                    setAbrirModalCriar(true);
                   }}
                 >
-                  <Text style={[styles.celebracaoBtnText, { color: theme.textPrimary }]}>Agora não</Text>
+                  <Text style={[styles.celebracaoBtnText, { color: theme.textPrimary }]}>
+                    Criar nova meta
+                  </Text>
                 </Pressable>
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.celebracaoActionsRow}>
+                <Pressable
+                  style={[styles.celebracaoBtn, styles.celebracaoBtnPrimary]}
+                  onPress={() => {
+                    setCelebracaoVisivel(false);
+                    setCelebracaoPayload(null);
+                  }}
+                >
+                  <Text style={styles.celebracaoBtnText}>Coletar pontos</Text>
+                </Pressable>
+              </View>
+            )}
           </Animated.View>
         </View>
       )}
@@ -1095,6 +1103,18 @@ export default function ObjetivosScreen() {
               onChangeText={setDataPrazoInput}
               autoCapitalize="none"
             />
+            <View style={[styles.planPreview, { backgroundColor: theme.planBg, borderColor: theme.cardBorder }]}>
+              <Text style={[styles.planTitle, { color: theme.textPrimary }]}>Sugestão de economia (RF02)</Text>
+              <Text style={[styles.planLine, { color: theme.textMuted }]}>
+                Economia Diária: {planoCriacao ? formatarMoeda(planoCriacao.diario) : "-"}
+              </Text>
+              <Text style={[styles.planLine, { color: theme.textMuted }]}>
+                Desafio Semanal: {planoCriacao ? formatarMoeda(planoCriacao.semanal) : "-"}
+              </Text>
+              <Text style={[styles.planLine, { color: theme.textMuted }]}>
+                Corte de Gastos Mensal: {planoCriacao ? formatarMoeda(planoCriacao.mensal) : "-"}
+              </Text>
+            </View>
             <View style={styles.actionsRow}>
               <Pressable style={[styles.btnSecundario, styles.flex1, { backgroundColor: theme.secondaryBtnBg }]} onPress={() => setAbrirModalEditar(false)}>
                 <Text style={styles.btnSecundarioTexto}>Cancelar</Text>
@@ -1285,14 +1305,14 @@ const styles = StyleSheet.create({
   metaHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10, overflow: "visible" },
   metaInfoCol: { flex: 1, gap: 4 },
   piggyWrap: {
-    width: 112,
-    height: 132,
-    borderRadius: 18,
+    width: 132,
+    height: 150,
+    borderRadius: 20,
     backgroundColor: "#F5EDFF",
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 22,
-    marginTop: 2,
+    paddingTop: 18,
+    marginTop: 0,
     overflow: "visible",
   },
   moreBtn: {
@@ -1320,16 +1340,18 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 2,
   },
-  statusBadgesRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
+  statusBadgesRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2, justifyContent: "space-between" },
   statusBadge: {
     flex: 1,
     borderRadius: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 6,
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeText: { fontWeight: "700", fontSize: 11, lineHeight: 11 },
+  statusBadgeStatus: { flex: 1.25 },
+  statusBadgeDate: { flex: 0.75 },
+  badgeText: { fontWeight: "700", fontSize: 11, lineHeight: 13 },
   statusDateText: { fontSize: 11, fontWeight: "700" },
   pctBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   pctBadgeText: { color: BRAND_MID, fontWeight: "800", fontSize: 12 },
