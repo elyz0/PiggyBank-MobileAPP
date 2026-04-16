@@ -7,8 +7,8 @@ import { calcularPlanoOriginal } from "@/utils/Calculos";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
   Alert,
+  Animated,
   AppState,
   FlatList,
   Modal,
@@ -63,9 +63,16 @@ function parseNumber(texto: string): number {
   return Number(texto.replace(",", "."));
 }
 
-function StatCard({ emoji, label, value, accent, isDark }: any) {
+const StatCard = React.forwardRef<View, any>(function StatCard(
+  { emoji, label, value, accent, isDark }: any,
+  ref,
+) {
   return (
-    <View style={[styles.statCardGrid, isDark ? styles.bgDarkCard : styles.bgLight]}>
+    <View
+      ref={ref}
+      collapsable={false}
+      style={[styles.statCardGrid, isDark ? styles.bgDarkCard : styles.bgLight]}
+    >
       <View style={[styles.statIconWrap, { backgroundColor: accent + "22" }]}>
         <Text style={styles.statEmoji}>{emoji}</Text>
       </View>
@@ -82,7 +89,7 @@ function StatCard({ emoji, label, value, accent, isDark }: any) {
       </Text>
     </View>
   );
-}
+});
 
 export default function ObjetivosScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -130,9 +137,11 @@ export default function ObjetivosScreen() {
   } | null>(null);
 
   const [coletandoPontos, setColetandoPontos] = useState(false);
+  const [pontosExibidos, setPontosExibidos] = useState(pontos);
   const pontosCardRef = useRef<View | null>(null);
   const celebracaoRootRef = useRef<View | null>(null);
   const celebracaoPanelRef = useRef<View | null>(null);
+  const pontosTween = useRef(new Animated.Value(pontos)).current;
 
   const COINS_FLY = 10;
   const moedasColetandoAnim = useRef(
@@ -218,6 +227,22 @@ export default function ObjetivosScreen() {
     });
     return () => sub.remove();
   }, [historico]);
+
+  useEffect(() => {
+    const listenerId = pontosTween.addListener(({ value }) => {
+      setPontosExibidos(Math.round(value));
+    });
+
+    return () => {
+      pontosTween.removeListener(listenerId);
+    };
+  }, [pontosTween]);
+
+  useEffect(() => {
+    pontosTween.stopAnimation();
+    pontosTween.setValue(pontos);
+    setPontosExibidos(pontos);
+  }, [pontos, pontosTween]);
 
   const registrarMovimentacao = async (
     item: Omit<HistoricoItem, "id" | "dataIso">,
@@ -453,10 +478,15 @@ export default function ObjetivosScreen() {
     });
 
     let finishCalled = false;
+    let pontosAplicados = false;
     const safeFinish = () => {
       if (finishCalled) return;
       finishCalled = true;
-      setPontos((prev) => prev + recompensa);
+      // Se a medição/layout falhar, ainda precisamos atualizar os pontos.
+      if (!pontosAplicados) {
+        pontosAplicados = true;
+        setPontos((prev) => prev + recompensa);
+      }
       setColetandoPontos(false);
       setCelebracaoVisivel(false);
       setCelebracaoPayload(null);
@@ -503,7 +533,25 @@ export default function ObjetivosScreen() {
             ]).start();
           });
 
-          setTimeout(() => safeFinish(), maxMs + 160);
+          setTimeout(() => {
+            const pontosAtuais = pontos;
+            const pontosFinais = pontosAtuais + recompensa;
+
+            Animated.timing(pontosTween, {
+              toValue: pontosFinais,
+              duration: 520,
+              useNativeDriver: false,
+            }).start(({ finished }) => {
+              if (finished) {
+                pontosAplicados = true;
+                setPontos(pontosFinais);
+              } else {
+                pontosAplicados = true;
+                setPontos((prev) => prev + recompensa);
+              }
+              safeFinish();
+            });
+          }, maxMs + 80);
         });
       });
     });
@@ -688,15 +736,14 @@ export default function ObjetivosScreen() {
         </View>
 
         <View style={styles.statsGrid}>
-          <View ref={pontosCardRef}>
-            <StatCard
-              emoji="⭐"
-              label="Pontos"
-              value={pontos.toLocaleString("pt-BR")}
-              accent="#F59E0B"
-              isDark={isDark}
-            />
-          </View>
+          <StatCard
+            ref={pontosCardRef}
+            emoji="⭐"
+            label="Pontos"
+            value={pontosExibidos.toLocaleString("pt-BR")}
+            accent="#F59E0B"
+            isDark={isDark}
+          />
           <StatCard
             emoji="🎯"
             label="Metas ativas"
@@ -995,7 +1042,12 @@ export default function ObjetivosScreen() {
       </ScrollView>
 
       {celebracaoVisivel && celebracaoPayload && (
-        <View style={styles.celebracaoFullscreen} pointerEvents="auto" ref={celebracaoRootRef}>
+        <View
+          style={styles.celebracaoFullscreen}
+          pointerEvents="auto"
+          ref={celebracaoRootRef}
+          collapsable={false}
+        >
           <Animated.View
             style={[
               styles.celebracaoDim,
@@ -1086,6 +1138,7 @@ export default function ObjetivosScreen() {
 
           <Animated.View
             ref={celebracaoPanelRef}
+            collapsable={false}
             style={[
               styles.celebracaoPanel,
               {
