@@ -176,10 +176,10 @@ export default function HomeScreen() {
 
   const { totalGuardado, totalMeta, metasCompletas } = useMemo(() => {
     const m = metas || [];
-    const tg = m.reduce((acc, curr) => acc + (curr.valorGuardado ?? 0), 0);
-    const tm = m.reduce((acc, curr) => acc + (curr.valorTotal ?? 0), 0);
+    const tg = m.reduce((acc, curr) => acc + (curr.valorAtual ?? 0), 0);
+    const tm = m.reduce((acc, curr) => acc + (curr.valorMeta ?? 0), 0);
     const mc = m.filter(
-      (curr) => curr.valorGuardado >= curr.valorTotal && curr.valorTotal > 0,
+      (curr) => curr.valorAtual >= curr.valorMeta && curr.valorMeta > 0,
     ).length;
     return { totalGuardado: tg, totalMeta: tm, metasCompletas: mc };
   }, [metas]);
@@ -266,8 +266,8 @@ export default function HomeScreen() {
             <MetaProgressCard
               nome={metaAtiva.nome}
               emoji={metaAtiva.emoji}
-              guardado={metaAtiva.valorGuardado}
-              total={metaAtiva.valorTotal}
+              guardado={metaAtiva.valorAtual}
+              total={metaAtiva.valorMeta}
               onPress={() => router.push("/objetivo")}
               isDark={isDark}
             />

@@ -104,17 +104,20 @@ const CATEGORIAS = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const COR = {
-  bg: "#0F0F1A",
-  card: "#1A1A2E",
-  cardBorder: "#2A2A4A",
-  accent: "#7C6FE0",
-  accentLight: "#A89CF0",
+  bg: "#F1F5FB",
+  hero: "#1E3A5F",
+  heroMid: "#2563EB",
+  heroLight: "#3B82F6",
+  card: "#FFFFFF",
+  cardBorder: "#E2E8F0",
+  accent: "#2563EB",
+  accentLight: "#3B82F6",
   gold: "#FFD700",
   green: "#4ADE80",
   red: "#F87171",
-  text: "#F0EEFF",
-  textMuted: "#9090B0",
-  tag: "#2A2A4A",
+  text: "#111827",
+  textMuted: "#64748B",
+  tag: "#EFF6FF",
 };
 
 // ─── Componente de card de produto ───────────────────────────────────────────
@@ -274,18 +277,22 @@ export default function LojaScreen() {
 
   return (
     <View style={styles.container}>
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={handleBack}>
-          <Text style={styles.backBtnText}>← Voltar</Text>
-        </Pressable>
-        <View>
-          <Text style={styles.headerTitle}>Loja</Text>
-          <Text style={styles.headerSub}>Gaste seus pontos com sabedoria</Text>
-        </View>
-        <View style={styles.pontosChip}>
-          <Text style={styles.pontosEmoji}>⭐</Text>
-          <Text style={styles.pontosValor}>{pontos}</Text>
+      <View style={styles.heroBanner}>
+        <View style={styles.heroCircle1} />
+        <View style={styles.heroCircle2} />
+        {/* ── Header ── */}
+        <View style={styles.header}>
+          <Pressable style={styles.backBtn} onPress={handleBack}>
+            <Text style={styles.backBtnText}>← Voltar</Text>
+          </Pressable>
+          <View>
+            <Text style={styles.headerTitle}>Loja</Text>
+            <Text style={styles.headerSub}>Gaste seus pontos com sabedoria</Text>
+          </View>
+          <View style={styles.pontosChip}>
+            <Text style={styles.pontosEmoji}>⭐</Text>
+            <Text style={styles.pontosValor}>{pontos}</Text>
+          </View>
         </View>
       </View>
 
@@ -419,6 +426,34 @@ export default function LojaScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COR.bg },
+  heroBanner: {
+    backgroundColor: COR.hero,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  heroCircle1: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: COR.heroMid,
+    opacity: 0.25,
+    top: -70,
+    right: -70,
+  },
+  heroCircle2: {
+    position: "absolute",
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: COR.heroLight,
+    opacity: 0.15,
+    bottom: -42,
+    left: 12,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -428,34 +463,38 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   backBtn: {
-    backgroundColor: COR.card,
+    backgroundColor: "rgba(255,255,255,0.12)",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: COR.cardBorder,
+    borderColor: "rgba(255,255,255,0.2)",
   },
-  backBtnText: { color: COR.accentLight, fontWeight: "600", fontSize: 13 },
+  backBtnText: { color: "#FFFFFF", fontWeight: "600", fontSize: 13 },
   headerTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: COR.text,
+    color: "#FFFFFF",
     textAlign: "center",
   },
-  headerSub: { fontSize: 11, color: COR.textMuted, textAlign: "center" },
+  headerSub: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.7)",
+    textAlign: "center",
+  },
   pontosChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#2A2A00",
+    backgroundColor: "rgba(255,255,255,0.14)",
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: "#4A4A00",
+    borderColor: "rgba(255,255,255,0.22)",
   },
   pontosEmoji: { fontSize: 15 },
-  pontosValor: { fontSize: 16, fontWeight: "800", color: COR.gold },
+  pontosValor: { fontSize: 16, fontWeight: "800", color: "#FCD34D" },
   filtrosRow: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -477,7 +516,7 @@ const styles = StyleSheet.create({
   },
   filtroBtnAtivo: { backgroundColor: COR.accent, borderColor: COR.accent },
   filtroEmoji: { fontSize: 14 },
-  filtroLabel: { fontSize: 13, color: COR.textMuted, fontWeight: "600" },
+  filtroLabel: { fontSize: 13, color: COR.textMuted, fontWeight: "700" },
   filtroLabelAtivo: { color: "#fff" },
   grid: { paddingBottom: 40, paddingHorizontal: 16 },
   gridInner: {
@@ -498,7 +537,7 @@ const styles = StyleSheet.create({
   cardDestaque: {
     borderColor: COR.accent,
     shadowColor: COR.accent,
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.18,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
     elevation: 6,
@@ -533,7 +572,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 14,
-    backgroundColor: "#252540",
+    backgroundColor: "#EFF6FF",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -586,19 +625,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: "#0D2B1A",
+    backgroundColor: "#ECFDF3",
   },
   btnEquipadoText: { color: COR.green, fontSize: 11, fontWeight: "700" },
   btnComprado: {
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: "#1A2B0D",
+    backgroundColor: "#F0FDF4",
   },
   btnCompradoText: { color: COR.green, fontSize: 11, fontWeight: "700" },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.75)",
+    backgroundColor: "rgba(15,23,42,0.6)",
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
@@ -662,14 +701,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 40,
     alignSelf: "center",
-    backgroundColor: "#222240",
+    backgroundColor: "#EFF6FF",
     borderRadius: 24,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: COR.accent,
     shadowColor: COR.accent,
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.2,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
     elevation: 10,

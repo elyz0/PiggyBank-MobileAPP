@@ -12,20 +12,19 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import "react-native-reanimated";
 
 // Importe o seu componente de animação (certifique-se que o caminho está correto)
+import { Meta } from "@/models";
+import {
+  createMeta,
+  deleteMeta,
+  getAllMetas,
+  updateMeta,
+} from "@/services/metaService";
 import AnimatedSplashScreen from "../components/AnimatedSplashScreen";
 
 // Impede que a Splash Screen nativa do Expo se esconda automaticamente
 SplashScreen.preventAutoHideAsync();
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
-
-export interface Meta {
-  id: string;
-  nome: string;
-  valorTotal: number;
-  valorGuardado: number;
-  emoji?: string;
-}
 
 export interface SaldoContextData {
   pontos: number;
@@ -40,6 +39,10 @@ export interface SaldoContextData {
   setUltimoDeposito: React.Dispatch<React.SetStateAction<string | null>>;
   recuperadoresOfensiva: number;
   setRecuperadoresOfensiva: React.Dispatch<React.SetStateAction<number>>;
+  carregandoMetas: boolean;
+  criarMeta: (nome: string, valorMeta: number, dataPrazo: string) => Promise<Meta>;
+  editarMeta: (metaAtualizada: Meta) => Promise<void>;
+  excluirMeta: (id: string) => Promise<void>;
   metas: Meta[];
   setMetas: React.Dispatch<React.SetStateAction<Meta[]>>;
   metaAtivaId: string | null;
@@ -76,22 +79,54 @@ export default function RootLayout() {
   const [recuperadoresOfensiva, setRecuperadoresOfensiva] = useState<number>(0);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [metaAtivaId, setMetaAtivaId] = useState<string | null>(null);
+  const [carregandoMetas, setCarregandoMetas] = useState(true);
 
-  // Efeito para preparar o app (carregar dados, esconder splash nativa)
+  // Carrega metas do armazenamento e prepara o app
   useEffect(() => {
     async function prepare() {
       try {
-        // Simulação de carregamento de dados (ou busca no AsyncStorage)
-        // Reduzido para 200ms para a animação da moeda aparecer logo
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        const metasSalvas = await getAllMetas();
+        setMetas(metasSalvas);
+        setMetaAtivaId((current) => current ?? metasSalvas[0]?.id ?? null);
       } catch (e) {
-        console.warn("Erro ao preparar o app:", e);
+        console.warn("Erro ao carregar metas:", e);
       } finally {
+        setCarregandoMetas(false);
         setAppIsReady(true);
       }
     }
     prepare();
   }, []);
+
+  const refreshMetas = async () => {
+    const metasSalvas = await getAllMetas();
+    setMetas(metasSalvas);
+    setMetaAtivaId((current) => current ?? metasSalvas[0]?.id ?? null);
+    return metasSalvas;
+  };
+
+  const criarMeta = async (nome: string, valorMeta: number, dataPrazo: string) => {
+    const novaMeta = await createMeta(nome, valorMeta, dataPrazo);
+    setMetas((prev) => [...prev, novaMeta]);
+    setMetaAtivaId((current) => current ?? novaMeta.id);
+    return novaMeta;
+  };
+
+  const editarMeta = async (metaAtualizada: Meta) => {
+    await updateMeta(metaAtualizada);
+    await refreshMetas();
+  };
+
+  const excluirMeta = async (id: string) => {
+    await deleteMeta(id);
+    setMetas((prev) => {
+      const next = prev.filter((meta) => meta.id !== id);
+      if (metaAtivaId === id) {
+        setMetaAtivaId(next[0]?.id ?? null);
+      }
+      return next;
+    });
+  };
 
   // Esconde a splash nativa assim que o componente estiver pronto para renderizar a animada
   useEffect(() => {
@@ -126,6 +161,10 @@ export default function RootLayout() {
           setUltimoDeposito,
           recuperadoresOfensiva,
           setRecuperadoresOfensiva,
+          carregandoMetas,
+          criarMeta,
+          editarMeta,
+          excluirMeta,
           metas,
           setMetas,
           metaAtivaId,
