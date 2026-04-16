@@ -25,6 +25,8 @@ import AnimatedSplashScreen from "../components/AnimatedSplashScreen";
 // Impede que a Splash Screen nativa do Expo se esconda automaticamente
 SplashScreen.preventAutoHideAsync();
 
+const PONTOS_KEY = "@piggybank:pontos";
+
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
 export interface SaldoContextData {
@@ -96,6 +98,13 @@ export default function RootLayout() {
         if (temaSalvo === "light" || temaSalvo === "dark") {
           setTema(temaSalvo);
         }
+
+        const pontosSalvos = await AsyncStorage.getItem(PONTOS_KEY);
+        if (pontosSalvos != null) {
+          const parsed = Number(pontosSalvos);
+          if (Number.isFinite(parsed) && parsed >= 0) setPontos(parsed);
+        }
+
         const metasSalvas = await getAllMetas();
         setMetas(metasSalvas);
         setMetaAtivaId((current) => current ?? metasSalvas[0]?.id ?? null);
@@ -108,6 +117,13 @@ export default function RootLayout() {
     }
     prepare();
   }, []);
+
+  // Persistência de pontos (evita reset ao fechar o app)
+  useEffect(() => {
+    AsyncStorage.setItem(PONTOS_KEY, String(pontos)).catch(() => {
+      // evita quebrar UI por erro de storage
+    });
+  }, [pontos]);
 
   const alternarTema = async () => {
     const proximo: "light" | "dark" = tema === "dark" ? "light" : "dark";
