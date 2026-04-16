@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 17, fontWeight: "800", letterSpacing: -0.2 },
   sectionLink: { fontSize: 13, color: BRAND_LIGHT, fontWeight: "600" },
-  carouselList: { paddingRight: 20, paddingBottom: 14, gap: 12 },
+  carouselList: { paddingRight: 20, paddingBottom: 26, gap: 12 },
   carouselCard: {
     width: 220,
     borderRadius: 20,
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     overflow: "visible",
-    marginBottom: 6,
+    marginBottom: 10,
   },
   carouselPiggyWrap: {
     height: 132,
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingTop: 12,
-    marginBottom: 10,
+    marginBottom: 12,
     overflow: "visible",
   },
   carouselPiggyWrapDark: { backgroundColor: "#312E4B" },

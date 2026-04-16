@@ -115,6 +115,8 @@ export default function ObjetivosScreen() {
   const [salvando, setSalvando] = useState(false);
   const [, setTicker] = useState(0);
   const piggyScaleCard = useRef(new Animated.Value(0.9)).current;
+  const [celebrandoMetaId, setCelebrandoMetaId] = useState<string | null>(null);
+  const celebracaoAnim = useRef(new Animated.Value(0)).current;
   const theme = {
     screenBg: isDark ? "#0F172A" : "#ECE7F2",
     cardBg: isDark ? "#1E293B" : "#FFFFFF",
@@ -309,6 +311,15 @@ export default function ObjetivosScreen() {
     }
   };
 
+  const iniciarCelebracao = (metaId: string) => {
+    setCelebrandoMetaId(metaId);
+    celebracaoAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(celebracaoAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.timing(celebracaoAnim, { toValue: 0, duration: 650, useNativeDriver: true }),
+    ]).start(() => setCelebrandoMetaId(null));
+  };
+
   const depositar = async (meta: Meta) => {
     const valor = parseNumber(valorMovInput[meta.id] ?? "");
     if (!Number.isFinite(valor) || valor <= 0) {
@@ -316,9 +327,84 @@ export default function ObjetivosScreen() {
       return;
     }
 
+    const restante = Math.max(meta.valorMeta - meta.valorAtual, 0);
+    const excedente = Math.max(valor - restante, 0);
+
+    // RN03: não permitir aporte maior que o restante
+    if (excedente > 0) {
+      Alert.alert(
+        "Aporte excede a meta",
+        `Faltavam ${formatarMoeda(restante)}.\nVocê informou ${formatarMoeda(valor)}.\nExcedente: ${formatarMoeda(excedente)}.\n\nDeseja prosseguir e finalizar a meta?`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Prosseguir",
+            style: "default",
+            onPress: () => {
+              setSalvando(true);
+              (async () => {
+                try {
+                  await atualizarMetaLocal(meta.id, meta.valorMeta);
+                  await registrarMovimentacao({
+                    metaId: meta.id,
+                    metaNome: meta.nome,
+                    tipo: "deposito",
+                    valor,
+                  });
+
+                  setPontos((prev) => prev + Math.max(1, Math.floor(valor / 5)));
+                  const hoje = hojeString();
+                  const ontem = new Date();
+                  ontem.setDate(ontem.getDate() - 1);
+                  if (ultimoDeposito !== hoje) {
+                    if (ultimoDeposito === ontem.toDateString()) setOfensiva((prev) => prev + 1);
+                    else setOfensiva(1);
+                    setUltimoDeposito(hoje);
+                  }
+                  setValorMovInput((prev) => ({ ...prev, [meta.id]: "" }));
+
+                  iniciarCelebracao(meta.id);
+
+                  Alert.alert(
+                    "🎉 Meta concluída!",
+                    `Você concluiu "${meta.nome}".\nExcedente de ${formatarMoeda(excedente)} detectado.`,
+                    [
+                      {
+                        text: "Criar nova meta",
+                        onPress: () => {
+                          setNomeNovaMeta(`Excedente da ${meta.nome}`);
+                          setValorMetaInput(String(excedente));
+                          setDataPrazoInput(meta.dataPrazo);
+                          setAbrirModalCriar(true);
+                        },
+                      },
+                      { text: "Agora não", style: "cancel" },
+                    ],
+                  );
+                } catch (e: any) {
+                  Alert.alert(
+                    "Erro ao prosseguir",
+                    e?.message ?? "Não foi possível finalizar a meta.",
+                  );
+                } finally {
+                  setSalvando(false);
+                }
+              })();
+            },
+          },
+        ],
+      );
+      return;
+    }
+
     setSalvando(true);
     try {
       const proximoValor = meta.valorAtual + valor;
+      const entrouConcluida =
+        meta.valorAtual < meta.valorMeta &&
+        proximoValor >= meta.valorMeta &&
+        meta.valorMeta > 0;
+
       await atualizarMetaLocal(meta.id, proximoValor);
       await registrarMovimentacao({
         metaId: meta.id,
@@ -337,6 +423,14 @@ export default function ObjetivosScreen() {
         setUltimoDeposito(hoje);
       }
       setValorMovInput((prev) => ({ ...prev, [meta.id]: "" }));
+
+      if (entrouConcluida) {
+        iniciarCelebracao(meta.id);
+        Alert.alert(
+          "🎉 Meta concluída!",
+          `Parabéns! Você concluiu "${meta.nome}".`,
+        );
+      }
     } catch (e: any) {
       Alert.alert("Erro ao depositar", e?.message ?? "Não foi possível registrar o depósito.");
     } finally {
@@ -519,23 +613,23 @@ export default function ObjetivosScreen() {
                           {meta.nome}
                         </Text>
 
-                        <View style={styles.metaBadgeRow}>
-                          <View
-                            style={[
-                              styles.statusTag,
-                              meta.status === "concluida"
-                                ? styles.statusConcluida
-                                : meta.status === "vencida"
-                                  ? styles.statusVencida
-                                  : styles.statusAndamento,
-                            ]}
-                          >
-                            <Text style={styles.statusText}>{statusLabel}</Text>
-                          </View>
+                        <View
+                          style={[
+                            styles.statusDateBox,
+                            meta.status === "concluida"
+                              ? styles.statusConcluida
+                              : meta.status === "vencida"
+                                ? styles.statusVencida
+                                : styles.statusAndamento,
+                          ]}
+                        >
+                          <Text style={[styles.statusText, { color: theme.textPrimary }]}>
+                            {statusLabel}
+                          </Text>
+                          <Text style={[styles.statusDateText, { color: theme.textMuted }]}>
+                            {formatarDataBr(meta.dataPrazo)}
+                          </Text>
                         </View>
-                        <Text style={[styles.metaPrazo, { color: theme.textMuted }]}>
-                          Prazo: {formatarDataBr(meta.dataPrazo)}
-                        </Text>
                       </View>
 
                       <Pressable
@@ -550,6 +644,30 @@ export default function ObjetivosScreen() {
                       >
                         <Text style={[styles.moreBtnText, { color: theme.textPrimary }]}>⋯</Text>
                       </Pressable>
+
+                      {celebrandoMetaId === meta.id && (
+                        <Animated.View
+                          pointerEvents="none"
+                          style={[
+                            styles.celebrationOverlay,
+                            {
+                              opacity: celebracaoAnim,
+                              transform: [
+                                {
+                                  scale: celebracaoAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0.95, 1.03],
+                                  }),
+                                },
+                              ],
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.celebrationText, { color: "#FFFFFF" }]}>
+                            🎉 Meta concluída!
+                          </Text>
+                        </Animated.View>
+                      )}
                     </View>
 
                     <View style={styles.metaProgressBlock}>
@@ -942,20 +1060,22 @@ const styles = StyleSheet.create({
     padding: 14,
     minHeight: 192,
     gap: 10,
+    overflow: "visible",
+    position: "relative",
   },
   metaCardConcluida: { opacity: 0.92 },
   metaCardAtiva: { borderColor: BRAND_LIGHT, shadowColor: BRAND_LIGHT, shadowOpacity: 0.18, shadowRadius: 10, elevation: 4 },
   metaCardVencida: { borderColor: "#EF4444", backgroundColor: "#FEF2F2" },
-  metaHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  metaHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10, overflow: "visible" },
   metaInfoCol: { flex: 1, gap: 4 },
   piggyWrap: {
     width: 112,
-    height: 110,
-    borderRadius: 14,
+    height: 132,
+    borderRadius: 18,
     backgroundColor: "#F5EDFF",
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 18,
+    paddingTop: 22,
     marginTop: 2,
     overflow: "visible",
   },
@@ -975,6 +1095,16 @@ const styles = StyleSheet.create({
   statusConcluida: { backgroundColor: "#ECFDF5" },
   statusVencida: { backgroundColor: "#FEE2E2" },
   statusText: { fontWeight: "700", fontSize: 11, color: "#1F2937" },
+  statusDateBox: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 2,
+  },
+  statusDateText: { fontSize: 11, fontWeight: "700" },
   pctBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   pctBadgeText: { color: BRAND_MID, fontWeight: "800", fontSize: 12 },
   metaNome: { color: "#111827", fontWeight: "800", fontSize: 16, lineHeight: 20 },
@@ -995,6 +1125,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   expandToggleText: { fontSize: 12, fontWeight: "700" },
+  celebrationOverlay: {
+    position: "absolute",
+    top: 6,
+    left: 0,
+    right: 0,
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    zIndex: 20,
+  },
+  celebrationText: {
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    fontWeight: "900",
+    backgroundColor: "rgba(37, 99, 235, 0.22)",
+    overflow: "hidden",
+  },
   planCard: { backgroundColor: "#F8FAFC", borderRadius: 12, padding: 10 },
   planTitle: { fontSize: 12, color: "#334155", fontWeight: "700", marginBottom: 4 },
   planLine: { fontSize: 12, color: "#475569", marginTop: 2 },
