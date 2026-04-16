@@ -27,6 +27,9 @@ const BRAND = "#1E3A5F";
 const BRAND_MID = "#2563EB";
 const BRAND_LIGHT = "#3B82F6";
 const HISTORY_KEY = "@piggybank:historico_metas";
+const CONFETTI_COUNT = 28;
+const COINS_COUNT = 10;
+const CONFETTI_COLORS = ["#F59E0B", "#EF4444", "#3B82F6", "#10B981", "#A855F7", "#F97316", "#22C55E", "#38BDF8"];
 
 interface HistoricoItem {
   id: string;
@@ -82,7 +85,7 @@ function StatCard({ emoji, label, value, accent, isDark }: any) {
 }
 
 export default function ObjetivosScreen() {
-  const { height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const {
     metas,
     setMetas,
@@ -115,8 +118,34 @@ export default function ObjetivosScreen() {
   const [salvando, setSalvando] = useState(false);
   const [, setTicker] = useState(0);
   const piggyScaleCard = useRef(new Animated.Value(0.9)).current;
-  const [celebrandoMetaId, setCelebrandoMetaId] = useState<string | null>(null);
+  const [celebracaoVisivel, setCelebracaoVisivel] = useState(false);
+  const [celebracaoPayload, setCelebracaoPayload] = useState<{
+    metaId: string;
+    nome: string;
+    excedente?: number;
+    dataPrazo: string;
+  } | null>(null);
+
   const celebracaoAnim = useRef(new Animated.Value(0)).current;
+  const burstAnim = useRef(new Animated.Value(0)).current;
+
+  const confetesAnim = useRef(
+    [...Array(CONFETTI_COUNT)].map(() => ({
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+    })),
+  ).current;
+
+  const moedasAnim = useRef(
+    [...Array(COINS_COUNT)].map(() => ({
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+    })),
+  ).current;
+
+  const celebracaoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const theme = {
     screenBg: isDark ? "#0F172A" : "#ECE7F2",
     cardBg: isDark ? "#1E293B" : "#FFFFFF",
@@ -188,15 +217,16 @@ export default function ObjetivosScreen() {
   };
 
   const metasView = useMemo(() => {
-    const views = [...metas]
-      .sort((a, b) => (b.dataCriacao > a.dataCriacao ? 1 : -1))
-      .map(toMetaView);
+    const statusRank = (status: string) =>
+      status === "em_andamento" ? 0 : status === "vencida" ? 1 : 2;
 
-    // Metas concluídas no final (UX)
+    const views = metas.map(toMetaView);
+
+    // UX: Ativas -> Vencidas -> Concluídas, sempre com dataCriacao desc dentro do grupo.
     return views.sort((a, b) => {
-      const aDone = a.status === "concluida" ? 1 : 0;
-      const bDone = b.status === "concluida" ? 1 : 0;
-      if (aDone !== bDone) return aDone - bDone; // não concluídas primeiro
+      const ra = statusRank(a.status);
+      const rb = statusRank(b.status);
+      if (ra !== rb) return ra - rb;
       return b.dataCriacao > a.dataCriacao ? 1 : -1;
     });
   }, [metas]);
@@ -311,13 +341,77 @@ export default function ObjetivosScreen() {
     }
   };
 
-  const iniciarCelebracao = (metaId: string) => {
-    setCelebrandoMetaId(metaId);
+  const iniciarCelebracao = (payload: { metaId: string; nome: string; excedente?: number; dataPrazo: string }) => {
+    if (celebracaoTimeoutRef.current) clearTimeout(celebracaoTimeoutRef.current);
+
+    setCelebracaoPayload(payload);
+    setCelebracaoVisivel(true);
+
     celebracaoAnim.setValue(0);
-    Animated.sequence([
-      Animated.timing(celebracaoAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
-      Animated.timing(celebracaoAnim, { toValue: 0, duration: 650, useNativeDriver: true }),
-    ]).start(() => setCelebrandoMetaId(null));
+    burstAnim.setValue(0);
+
+    // Reset confetes/coins para permitir múltiplas celebrações sem “sujar” animações anteriores.
+    confetesAnim.forEach((c) => {
+      c.x.setValue(0);
+      c.y.setValue(-40 - Math.random() * 80);
+      c.opacity.setValue(0);
+    });
+    moedasAnim.forEach((m) => {
+      m.x.setValue(0);
+      m.y.setValue(18 + Math.random() * 24);
+      m.opacity.setValue(0);
+    });
+
+    Animated.parallel([
+      Animated.timing(celebracaoAnim, { toValue: 1, duration: 240, useNativeDriver: true }),
+      Animated.timing(burstAnim, { toValue: 1, duration: 520, useNativeDriver: true }),
+    ]).start();
+
+    // Confetes caindo.
+    confetesAnim.forEach((conf) => {
+      const randomX = (Math.random() - 0.5) * screenWidth * 0.85;
+      const targetY = screenHeight + 60 + Math.random() * 140;
+      const delay = Math.random() * 240;
+      const duration = 980 + Math.random() * 780;
+
+      const anim = Animated.sequence([
+        Animated.delay(delay),
+        Animated.parallel([
+          Animated.timing(conf.opacity, { toValue: 1, duration: 90, useNativeDriver: true }),
+          Animated.timing(conf.x, { toValue: randomX, duration, useNativeDriver: true }),
+          Animated.timing(conf.y, { toValue: targetY, duration, useNativeDriver: true }),
+        ]),
+      ]);
+
+      anim.start();
+    });
+
+    // Moedas “subindo” do centro.
+    moedasAnim.forEach((coin) => {
+      const randomX = (Math.random() - 0.5) * screenWidth * 0.18;
+      const targetY = -120 - Math.random() * 90;
+      const delay = Math.random() * 180;
+      const duration = 720 + Math.random() * 520;
+
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.parallel([
+          Animated.timing(coin.opacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+          Animated.timing(coin.x, { toValue: randomX, duration, useNativeDriver: true }),
+          Animated.timing(coin.y, { toValue: targetY, duration, useNativeDriver: true }),
+        ]),
+      ]).start();
+    });
+
+    const shouldAutoDismiss = !payload.excedente || payload.excedente <= 0;
+    const dismissAfterMs = shouldAutoDismiss ? 2800 : 10000;
+
+    celebracaoTimeoutRef.current = setTimeout(() => {
+      setCelebracaoVisivel(false);
+      setCelebracaoPayload(null);
+      celebracaoAnim.setValue(0);
+      burstAnim.setValue(0);
+    }, dismissAfterMs);
   };
 
   const depositar = async (meta: Meta) => {
@@ -363,24 +457,12 @@ export default function ObjetivosScreen() {
                   }
                   setValorMovInput((prev) => ({ ...prev, [meta.id]: "" }));
 
-                  iniciarCelebracao(meta.id);
-
-                  Alert.alert(
-                    "🎉 Meta concluída!",
-                    `Você concluiu "${meta.nome}".\nExcedente de ${formatarMoeda(excedente)} detectado.`,
-                    [
-                      {
-                        text: "Criar nova meta",
-                        onPress: () => {
-                          setNomeNovaMeta(`Excedente da ${meta.nome}`);
-                          setValorMetaInput(String(excedente));
-                          setDataPrazoInput(meta.dataPrazo);
-                          setAbrirModalCriar(true);
-                        },
-                      },
-                      { text: "Agora não", style: "cancel" },
-                    ],
-                  );
+                  iniciarCelebracao({
+                    metaId: meta.id,
+                    nome: meta.nome,
+                    excedente,
+                    dataPrazo: meta.dataPrazo,
+                  });
                 } catch (e: any) {
                   Alert.alert(
                     "Erro ao prosseguir",
@@ -425,11 +507,11 @@ export default function ObjetivosScreen() {
       setValorMovInput((prev) => ({ ...prev, [meta.id]: "" }));
 
       if (entrouConcluida) {
-        iniciarCelebracao(meta.id);
-        Alert.alert(
-          "🎉 Meta concluída!",
-          `Parabéns! Você concluiu "${meta.nome}".`,
-        );
+        iniciarCelebracao({
+          metaId: meta.id,
+          nome: meta.nome,
+          dataPrazo: meta.dataPrazo,
+        });
       }
     } catch (e: any) {
       Alert.alert("Erro ao depositar", e?.message ?? "Não foi possível registrar o depósito.");
@@ -564,6 +646,9 @@ export default function ObjetivosScreen() {
               contentContainerStyle={styles.metasListContent}
               renderItem={({ item: meta, index }) => {
                 const expandida = meta.id === metaExpandidaId;
+                const comecouVencidas =
+                  meta.status === "vencida" &&
+                  (index === 0 || metasView[index - 1]?.status !== "vencida");
                 const comecouConcluidas =
                   meta.status === "concluida" &&
                   (index === 0 || metasView[index - 1]?.status !== "concluida");
@@ -576,6 +661,21 @@ export default function ObjetivosScreen() {
 
                 return (
                   <View>
+                    {comecouVencidas && (
+                      <View style={styles.vencidasDivider}>
+                        <View style={styles.vencidasLine} />
+                        <Text
+                          style={[
+                            styles.vencidasLabel,
+                            { color: theme.textMuted },
+                          ]}
+                        >
+                          Vencidas
+                        </Text>
+                        <View style={styles.vencidasLine} />
+                      </View>
+                    )}
+
                     {comecouConcluidas && (
                       <View style={styles.concluidasDivider}>
                         <View style={styles.concluidasLine} />
@@ -613,22 +713,36 @@ export default function ObjetivosScreen() {
                           {meta.nome}
                         </Text>
 
-                        <View
-                          style={[
-                            styles.statusDateBox,
-                            meta.status === "concluida"
-                              ? styles.statusConcluida
-                              : meta.status === "vencida"
-                                ? styles.statusVencida
-                                : styles.statusAndamento,
-                          ]}
-                        >
-                          <Text style={[styles.statusText, { color: theme.textPrimary }]}>
-                            {statusLabel}
-                          </Text>
-                          <Text style={[styles.statusDateText, { color: theme.textMuted }]}>
-                            {formatarDataBr(meta.dataPrazo)}
-                          </Text>
+                        <View style={styles.statusBadgesRow}>
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              meta.status === "concluida"
+                                ? styles.statusConcluida
+                                : meta.status === "vencida"
+                                  ? styles.statusVencida
+                                  : styles.statusAndamento,
+                            ]}
+                          >
+                            <Text style={[styles.badgeText, { color: theme.textPrimary }]} numberOfLines={1}>
+                              {statusLabel}
+                            </Text>
+                          </View>
+
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              meta.status === "concluida"
+                                ? styles.statusConcluida
+                                : meta.status === "vencida"
+                                  ? styles.statusVencida
+                                  : styles.statusAndamento,
+                            ]}
+                          >
+                            <Text style={[styles.badgeText, { color: theme.textMuted }]} numberOfLines={1}>
+                              {formatarDataBr(meta.dataPrazo)}
+                            </Text>
+                          </View>
                         </View>
                       </View>
 
@@ -645,29 +759,6 @@ export default function ObjetivosScreen() {
                         <Text style={[styles.moreBtnText, { color: theme.textPrimary }]}>⋯</Text>
                       </Pressable>
 
-                      {celebrandoMetaId === meta.id && (
-                        <Animated.View
-                          pointerEvents="none"
-                          style={[
-                            styles.celebrationOverlay,
-                            {
-                              opacity: celebracaoAnim,
-                              transform: [
-                                {
-                                  scale: celebracaoAnim.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [0.95, 1.03],
-                                  }),
-                                },
-                              ],
-                            },
-                          ]}
-                        >
-                          <Text style={[styles.celebrationText, { color: "#FFFFFF" }]}>
-                            🎉 Meta concluída!
-                          </Text>
-                        </Animated.View>
-                      )}
                     </View>
 
                     <View style={styles.metaProgressBlock}>
@@ -798,6 +889,131 @@ export default function ObjetivosScreen() {
           {ultimas3.length === 0 && <Text style={[styles.muted, { color: theme.textMuted }]}>Ainda não há movimentações.</Text>}
         </View>
       </ScrollView>
+
+      {celebracaoVisivel && celebracaoPayload && (
+        <View style={styles.celebracaoFullscreen} pointerEvents="auto">
+          <Animated.View
+            style={[
+              styles.celebracaoDim,
+              {
+                opacity: celebracaoAnim,
+                backgroundColor: isDark ? "rgba(15,23,42,0.55)" : "rgba(2,6,23,0.35)",
+              },
+            ]}
+          />
+
+          {/* Efeitos (confetes/burst/moedas) */}
+          <View style={styles.celebracaoEffectsLayer} pointerEvents="none">
+            {confetesAnim.map((conf, idx) => (
+              <Animated.View
+                key={`conf-${idx}`}
+                style={[
+                  styles.confettiPiece,
+                  {
+                    backgroundColor: CONFETTI_COLORS[idx % CONFETTI_COLORS.length],
+                    opacity: conf.opacity,
+                    left: screenWidth / 2,
+                    top: 0,
+                    marginLeft: -4,
+                    transform: [{ translateX: conf.x }, { translateY: conf.y }],
+                  },
+                ]}
+              />
+            ))}
+
+            <Animated.View
+              style={[
+                styles.celebracaoBurst,
+                {
+                  opacity: burstAnim,
+                  transform: [
+                    {
+                      scale: burstAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.7, 1.8],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+
+            {moedasAnim.map((coin, idx) => (
+              <Animated.View
+                key={`coin-${idx}`}
+                style={[
+                  styles.coinPiece,
+                  {
+                    opacity: coin.opacity,
+                    left: screenWidth / 2,
+                    top: screenHeight * 0.52,
+                    marginLeft: -11,
+                    transform: [{ translateX: coin.x }, { translateY: coin.y }],
+                  },
+                ]}
+              >
+                <Text style={styles.coinEmoji}>🪙</Text>
+              </Animated.View>
+            ))}
+          </View>
+
+          <Animated.View
+            style={[
+              styles.celebracaoPanel,
+              {
+                opacity: celebracaoAnim,
+                transform: [
+                  {
+                    scale: celebracaoAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.98, 1.02],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.celebracaoTitle}>🎉 Meta concluída!</Text>
+            <Text style={styles.celebracaoSubtitle}>
+              Você concluiu &quot;{celebracaoPayload.nome}&quot;.
+            </Text>
+
+            {typeof celebracaoPayload.excedente === "number" && celebracaoPayload.excedente > 0 && (
+              <Text style={styles.celebracaoSubtitle}>
+                Excedente de {formatarMoeda(celebracaoPayload.excedente)} detectado.
+              </Text>
+            )}
+
+            {typeof celebracaoPayload.excedente === "number" && celebracaoPayload.excedente > 0 ? (
+              <View style={styles.celebracaoActionsRow}>
+                <Pressable
+                  style={[styles.celebracaoBtn, styles.celebracaoBtnPrimary]}
+                  onPress={() => {
+                    setCelebracaoVisivel(false);
+                    setCelebracaoPayload(null);
+                    setNomeNovaMeta(`Excedente da ${celebracaoPayload.nome}`);
+                    setValorMetaInput(String(celebracaoPayload.excedente));
+                    setDataPrazoInput(celebracaoPayload.dataPrazo);
+                    setAbrirModalCriar(true);
+                  }}
+                >
+                  <Text style={styles.celebracaoBtnText}>Criar nova meta</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.celebracaoBtn, styles.celebracaoBtnGhost]}
+                  onPress={() => {
+                    setCelebracaoVisivel(false);
+                    setCelebracaoPayload(null);
+                  }}
+                >
+                  <Text style={[styles.celebracaoBtnText, { color: theme.textPrimary }]}>Agora não</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </Animated.View>
+        </View>
+      )}
 
       <Modal visible={abrirModalCriar} animationType="slide" transparent onRequestClose={() => setAbrirModalCriar(false)}>
         <View style={styles.modalOverlay}>
@@ -1104,6 +1320,16 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 2,
   },
+  statusBadgesRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
+  statusBadge: {
+    flex: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: { fontWeight: "700", fontSize: 11, lineHeight: 11 },
   statusDateText: { fontSize: 11, fontWeight: "700" },
   pctBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   pctBadgeText: { color: BRAND_MID, fontWeight: "800", fontSize: 12 },
@@ -1125,25 +1351,96 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   expandToggleText: { fontSize: 12, fontWeight: "700" },
-  celebrationOverlay: {
+  // Overlay de celebração (metas concluídas)
+  celebracaoFullscreen: {
     position: "absolute",
-    top: 6,
+    top: 0,
     left: 0,
     right: 0,
-    height: "100%",
+    bottom: 0,
+    zIndex: 999,
+    justifyContent: "center",
     alignItems: "center",
-    justifyContent: "flex-start",
-    zIndex: 20,
   },
-  celebrationText: {
-    marginTop: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  celebracaoDim: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  celebracaoEffectsLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  confettiPiece: {
+    position: "absolute",
+    width: 8,
+    height: 3,
+    borderRadius: 2,
+  },
+  celebracaoBurst: {
+    position: "absolute",
+    top: "42%",
+    left: "50%",
+    width: 74,
+    height: 74,
+    marginLeft: -37,
+    marginTop: -37,
+    borderRadius: 37,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.65)",
+  },
+  celebracaoPanel: {
+    width: "86%",
+    padding: 18,
+    borderRadius: 18,
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+  },
+  celebracaoTitle: { fontSize: 22, fontWeight: "900", color: "#FFFFFF" },
+  celebracaoSubtitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.95)",
+    marginTop: 6,
+    textAlign: "center",
+  },
+  celebracaoActionsRow: { flexDirection: "row", gap: 10, marginTop: 14, width: "100%" },
+  celebracaoBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
     borderRadius: 14,
-    fontWeight: "900",
-    backgroundColor: "rgba(37, 99, 235, 0.22)",
-    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
   },
+  celebracaoBtnPrimary: { backgroundColor: "#FFFFFF" },
+  celebracaoBtnGhost: {
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.55)",
+  },
+  celebracaoBtnText: { color: "#1E3A5F", fontWeight: "900", fontSize: 13 },
+  coinPiece: {
+    position: "absolute",
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#FBBF24",
+    borderWidth: 2,
+    borderColor: "#F59E0B",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 3,
+  },
+  coinEmoji: { fontSize: 12 },
   planCard: { backgroundColor: "#F8FAFC", borderRadius: 12, padding: 10 },
   planTitle: { fontSize: 12, color: "#334155", fontWeight: "700", marginBottom: 4 },
   planLine: { fontSize: 12, color: "#475569", marginTop: 2 },
@@ -1158,6 +1455,17 @@ const styles = StyleSheet.create({
   },
   concluidasLine: { flex: 1, height: 1, backgroundColor: "#CBD5E1", opacity: 0.6 },
   concluidasLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 0.6, textTransform: "uppercase" },
+  vencidasDivider: {
+    marginTop: 14,
+    marginBottom: 6,
+    paddingHorizontal: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    opacity: 0.85,
+  },
+  vencidasLine: { flex: 1, height: 1, backgroundColor: "#CBD5E1", opacity: 0.6 },
+  vencidasLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 0.6, textTransform: "uppercase" },
   input: {
     borderWidth: 1,
     borderColor: "#CBD5E1",
