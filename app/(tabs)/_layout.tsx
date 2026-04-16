@@ -1,72 +1,50 @@
-import { Stack } from "expo-router";
-import React, { createContext, useContext, useState } from "react";
+// app/(tabs)/_layout.tsx
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import React from "react";
+import { useColorScheme } from "react-native";
 
-// 1. Definição do objeto de uma Meta
-interface Meta {
-  id: string;
-  nome: string;
-  valorTotal: number;
-  valorGuardado: number; // Saldo acumulado específico desta meta
-  salarioRef: number; // Salário registrado no momento da criação
-  diasPrazo: number; // Em quantos dias quer alcançar
-  dataCriacao: number;
-}
-
-// 2. Interface do Contexto Global
-interface SaldoContextData {
-  saldo: number;
-  setSaldo: React.Dispatch<React.SetStateAction<number>>;
-
-  // Gerenciamento de Múltiplas Metas
-  metas: Meta[];
-  setMetas: React.Dispatch<React.SetStateAction<Meta[]>>;
-  metaAtivaId: string | null;
-  setMetaAtivaId: React.Dispatch<React.SetStateAction<string | null>>;
-
-  // Loja e Pontos
-  pontos: number;
-  setPontos: React.Dispatch<React.SetStateAction<number>>;
-  chapeusComprados: string[];
-  setChapeusComprados: React.Dispatch<React.SetStateAction<string[]>>;
-  chapeuEquipado: string;
-  setChapeuEquipado: React.Dispatch<React.SetStateAction<string>>;
-}
-
-const SaldoContext = createContext<SaldoContextData>({} as SaldoContextData);
-
-export const useSaldo = () => useContext(SaldoContext);
-
-export default function RootLayout() {
-  // Estado do Porquinho
-  const [saldo, setSaldo] = useState(0);
-
-  // Estados da Lista de Metas
-  const [metas, setMetas] = useState<Meta[]>([]);
-  const [metaAtivaId, setMetaAtivaId] = useState<string | null>(null);
-
-  // Estados da Loja
-  const [pontos, setPontos] = useState(0);
-  const [chapeusComprados, setChapeusComprados] = useState<string[]>([]);
-  const [chapeuEquipado, setChapeuEquipado] = useState("");
+export default function TabLayout() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
   return (
-    <SaldoContext.Provider
-      value={{
-        saldo,
-        setSaldo,
-        metas,
-        setMetas,
-        metaAtivaId,
-        setMetaAtivaId,
-        pontos,
-        setPontos,
-        chapeusComprados,
-        setChapeusComprados,
-        chapeuEquipado,
-        setChapeuEquipado,
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: isDark ? "#F9FAFB" : "#2563EB",
+        tabBarInactiveTintColor: isDark ? "#4B5563" : "#94A3B8",
+        tabBarStyle: {
+          backgroundColor: isDark ? "#111827" : "#FFFFFF",
+          borderTopColor: isDark ? "#1E2D45" : "#E2E8F0",
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "600",
+        },
       }}
     >
-      <Stack screenOptions={{ headerShown: false }} />
-    </SaldoContext.Provider>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Início",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="objetivo" // Certifique-se que o arquivo app/(tabs)/objetivo.tsx existe
+        options={{
+          title: "Metas",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="locate" size={size} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
