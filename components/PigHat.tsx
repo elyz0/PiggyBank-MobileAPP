@@ -88,6 +88,27 @@ export function PigHat({ chapeuEquipado }: PigHatProps) {
     );
   }
 
+  if (chapeuEquipado === "chapeu_chef") {
+    return (
+      <View style={styles.posicaoChef}>
+        <View style={styles.chefBase} />
+        <View style={styles.chefTopoEsq} />
+        <View style={styles.chefTopoCentro} />
+        <View style={styles.chefTopoDir} />
+      </View>
+    );
+  }
+
+  if (chapeuEquipado === "chapeu_astronauta") {
+    return (
+      <View style={styles.posicaoAstronauta}>
+        <View style={styles.astroDomo} />
+        <View style={styles.astroFaixa} />
+        <View style={styles.astroReflexo} />
+      </View>
+    );
+  }
+
   if (chapeuEquipado === "chapeu_noel") {
     return (
       <View style={styles.posicaoNoel}>
@@ -366,6 +387,95 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1c40f",
     borderRadius: 1,
     transform: [{ rotate: "45deg" }],
+  },
+
+  // ── Chef ────────────────────────────────────────────────
+  posicaoChef: {
+    position: "absolute",
+    top: -50,
+    left: 28,
+    zIndex: 10,
+    width: 54,
+    alignItems: "center",
+  },
+  chefBase: {
+    width: 50,
+    height: 14,
+    backgroundColor: "#ffffff",
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: "#d6d6d6",
+    zIndex: 2,
+  },
+  chefTopoEsq: {
+    position: "absolute",
+    top: -16,
+    left: 2,
+    width: 18,
+    height: 22,
+    borderRadius: 10,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#d6d6d6",
+  },
+  chefTopoCentro: {
+    position: "absolute",
+    top: -22,
+    left: 18,
+    width: 20,
+    height: 28,
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#d6d6d6",
+  },
+  chefTopoDir: {
+    position: "absolute",
+    top: -16,
+    right: 2,
+    width: 18,
+    height: 22,
+    borderRadius: 10,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#d6d6d6",
+  },
+
+  // ── Astronauta ──────────────────────────────────────────
+  posicaoAstronauta: {
+    position: "absolute",
+    top: -42,
+    left: 22,
+    zIndex: 10,
+    alignItems: "center",
+  },
+  astroDomo: {
+    width: 62,
+    height: 42,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    backgroundColor: "#dbeafe",
+    borderWidth: 2,
+    borderColor: "#60a5fa",
+  },
+  astroFaixa: {
+    position: "absolute",
+    bottom: -2,
+    width: 62,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#94a3b8",
+  },
+  astroReflexo: {
+    position: "absolute",
+    top: 8,
+    right: 12,
+    width: 12,
+    height: 20,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.65)",
   },
 
   // ── Gorro de Natal ───────────────────────────────────────

@@ -1,11 +1,13 @@
 import { useSaldo } from "@/app/_layout";
+import { Piggy } from "@/components/Piggy";
 import { Meta } from "@/models";
 import { toMetaView } from "@/services/metaViewService";
 import { getMetas, saveMetas } from "@/storage/metaStorage";
 import { calcularPlanoOriginal } from "@/utils/Calculos";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Alert,
   Modal,
   Pressable,
@@ -63,6 +65,7 @@ export default function ObjetivosScreen() {
     setOfensiva,
     ultimoDeposito,
     setUltimoDeposito,
+    chapeuEquipado,
   } = useSaldo();
 
   const [metaExpandidaId, setMetaExpandidaId] = useState<string | null>(null);
@@ -75,6 +78,7 @@ export default function ObjetivosScreen() {
   const [abrirModalHistorico, setAbrirModalHistorico] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [, setTicker] = useState(0);
+  const piggyScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const id = setInterval(() => setTicker((prev) => prev + 1), 60000);
@@ -334,7 +338,10 @@ export default function ObjetivosScreen() {
                 >
                   <View style={styles.metaTop}>
                     <View style={styles.piggyWrap}>
-                      <Text style={styles.piggyEmoji}>🐷</Text>
+                      <Piggy
+                        scaleAnim={piggyScale}
+                        chapeuEquipado={chapeuEquipado || null}
+                      />
                     </View>
                     <View
                       style={[
@@ -580,8 +587,15 @@ const styles = StyleSheet.create({
   metaCardAtiva: { borderColor: BRAND_LIGHT, shadowColor: BRAND_LIGHT, shadowOpacity: 0.18, shadowRadius: 10, elevation: 4 },
   metaCardVencida: { borderColor: "#EF4444", backgroundColor: "#FEF2F2" },
   metaTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  piggyWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: "#F5EDFF", alignItems: "center", justifyContent: "center" },
-  piggyEmoji: { fontSize: 34 },
+  piggyWrap: {
+    width: 124,
+    height: 104,
+    borderRadius: 20,
+    backgroundColor: "#F5EDFF",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "visible",
+  },
   statusTag: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   statusAndamento: { backgroundColor: "#EFF6FF" },
   statusConcluida: { backgroundColor: "#ECFDF5" },
