@@ -115,6 +115,8 @@ export default function ObjetivosScreen() {
   const [abrirModalEditar, setAbrirModalEditar] = useState(false);
   const [abrirModalHistorico, setAbrirModalHistorico] = useState(false);
   const [metaEditando, setMetaEditando] = useState<Meta | null>(null);
+  const [acoesMenuOpen, setAcoesMenuOpen] = useState(false);
+  const [acoesMeta, setAcoesMeta] = useState<Meta | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [, setTicker] = useState(0);
   const piggyScaleCard = useRef(new Animated.Value(0.9)).current;
@@ -124,7 +126,23 @@ export default function ObjetivosScreen() {
     nome: string;
     excedente?: number;
     dataPrazo: string;
+    pontosRecompensa: number;
   } | null>(null);
+
+  const [coletandoPontos, setColetandoPontos] = useState(false);
+  const pontosCardRef = useRef<View | null>(null);
+  const celebracaoRootRef = useRef<View | null>(null);
+  const celebracaoPanelRef = useRef<View | null>(null);
+
+  const COINS_FLY = 10;
+  const moedasColetandoAnim = useRef(
+    [...Array(COINS_FLY)].map(() => ({
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(1),
+    })),
+  ).current;
 
   const celebracaoAnim = useRef(new Animated.Value(0)).current;
   const burstAnim = useRef(new Animated.Value(0)).current;
@@ -341,7 +359,13 @@ export default function ObjetivosScreen() {
     }
   };
 
-  const iniciarCelebracao = (payload: { metaId: string; nome: string; excedente?: number; dataPrazo: string }) => {
+  const iniciarCelebracao = (payload: {
+    metaId: string;
+    nome: string;
+    excedente?: number;
+    dataPrazo: string;
+    pontosRecompensa: number;
+  }) => {
     if (celebracaoTimeoutRef.current) clearTimeout(celebracaoTimeoutRef.current);
 
     setCelebracaoPayload(payload);
@@ -406,6 +430,85 @@ export default function ObjetivosScreen() {
     // Não auto-fechar: o usuário coleta os pontos via botão do overlay.
   };
 
+  const coletarPontos = (after?: () => void) => {
+    if (coletandoPontos) return;
+
+    const payload = celebracaoPayload;
+    const recompensa = payload?.pontosRecompensa ?? 0;
+
+    if (!payload || recompensa <= 0) {
+      setCelebracaoVisivel(false);
+      setCelebracaoPayload(null);
+      after?.();
+      return;
+    }
+
+    setColetandoPontos(true);
+
+    moedasColetandoAnim.forEach((coin) => {
+      coin.x.setValue(0);
+      coin.y.setValue(0);
+      coin.opacity.setValue(0);
+      coin.scale.setValue(1);
+    });
+
+    let finishCalled = false;
+    const safeFinish = () => {
+      if (finishCalled) return;
+      finishCalled = true;
+      setPontos((prev) => prev + recompensa);
+      setColetandoPontos(false);
+      setCelebracaoVisivel(false);
+      setCelebracaoPayload(null);
+      after?.();
+    };
+
+    const root = celebracaoRootRef.current;
+    const panel = celebracaoPanelRef.current;
+    const card = pontosCardRef.current;
+
+    if (!root || !panel || !card) {
+      safeFinish();
+      return;
+    }
+
+    root.measureInWindow((rootX, rootY) => {
+      panel.measureInWindow((panelX, panelY, panelW, panelH) => {
+        card.measureInWindow((cardX, cardY, cardW, cardH) => {
+          const startX = panelX - rootX + panelW / 2;
+          const startY = panelY - rootY + panelH / 2;
+          const targetX = cardX - rootX + cardW / 2;
+          const targetY = cardY - rootY + cardH / 2;
+
+          let maxMs = 0;
+          moedasColetandoAnim.forEach((coin) => {
+            const spreadX = (Math.random() - 0.5) * 60;
+            const spreadY = (Math.random() - 0.5) * 30;
+            const destSpreadX = (Math.random() - 0.5) * 40;
+            const destSpreadY = -Math.random() * 16;
+
+            const duration = 700 + Math.random() * 260;
+            maxMs = Math.max(maxMs, duration);
+
+            coin.x.setValue(startX + spreadX);
+            coin.y.setValue(startY + spreadY);
+            coin.opacity.setValue(0);
+            coin.scale.setValue(1);
+
+            Animated.parallel([
+              Animated.timing(coin.opacity, { toValue: 1, duration: 100, useNativeDriver: true }),
+              Animated.timing(coin.x, { toValue: targetX + destSpreadX, duration, useNativeDriver: true }),
+              Animated.timing(coin.y, { toValue: targetY + destSpreadY, duration, useNativeDriver: true }),
+              Animated.timing(coin.scale, { toValue: 0.75, duration, useNativeDriver: true }),
+            ]).start();
+          });
+
+          setTimeout(() => safeFinish(), maxMs + 160);
+        });
+      });
+    });
+  };
+
   const depositar = async (meta: Meta) => {
     const valor = parseNumber(valorMovInput[meta.id] ?? "");
     if (!Number.isFinite(valor) || valor <= 0) {
@@ -415,6 +518,7 @@ export default function ObjetivosScreen() {
 
     const restante = Math.max(meta.valorMeta - meta.valorAtual, 0);
     const excedente = Math.max(valor - restante, 0);
+    const pontosGanhos = Math.max(1, Math.floor(valor / 5));
 
     // RN03: não permitir aporte maior que o restante
     if (excedente > 0) {
@@ -438,7 +542,6 @@ export default function ObjetivosScreen() {
                     valor,
                   });
 
-                  setPontos((prev) => prev + Math.max(1, Math.floor(valor / 5)));
                   const hoje = hojeString();
                   const ontem = new Date();
                   ontem.setDate(ontem.getDate() - 1);
@@ -454,6 +557,7 @@ export default function ObjetivosScreen() {
                     nome: meta.nome,
                     excedente,
                     dataPrazo: meta.dataPrazo,
+                    pontosRecompensa: pontosGanhos,
                   });
                 } catch (e: any) {
                   Alert.alert(
@@ -487,7 +591,6 @@ export default function ObjetivosScreen() {
         valor,
       });
 
-      setPontos((prev) => prev + Math.max(1, Math.floor(valor / 5)));
       const hoje = hojeString();
       const ontem = new Date();
       ontem.setDate(ontem.getDate() - 1);
@@ -503,7 +606,10 @@ export default function ObjetivosScreen() {
           metaId: meta.id,
           nome: meta.nome,
           dataPrazo: meta.dataPrazo,
+          pontosRecompensa: pontosGanhos,
         });
+      } else {
+        setPontos((prev) => prev + pontosGanhos);
       }
     } catch (e: any) {
       Alert.alert("Erro ao depositar", e?.message ?? "Não foi possível registrar o depósito.");
@@ -582,13 +688,15 @@ export default function ObjetivosScreen() {
         </View>
 
         <View style={styles.statsGrid}>
-          <StatCard
-            emoji="⭐"
-            label="Pontos"
-            value={pontos.toLocaleString("pt-BR")}
-            accent="#F59E0B"
-            isDark={isDark}
-          />
+          <View ref={pontosCardRef}>
+            <StatCard
+              emoji="⭐"
+              label="Pontos"
+              value={pontos.toLocaleString("pt-BR")}
+              accent="#F59E0B"
+              isDark={isDark}
+            />
+          </View>
           <StatCard
             emoji="🎯"
             label="Metas ativas"
@@ -701,9 +809,24 @@ export default function ObjetivosScreen() {
                       </View>
 
                       <View style={styles.metaInfoCol}>
-                        <Text style={[styles.metaNome, { color: theme.textPrimary }]} numberOfLines={2}>
-                          {meta.nome}
-                        </Text>
+                        <View style={styles.metaTitleRow}>
+                          <Text
+                            style={[styles.metaNome, { color: theme.textPrimary, textAlign: "center" }]}
+                            numberOfLines={2}
+                          >
+                            {meta.nome}
+                          </Text>
+
+                          <Pressable
+                            onPress={() => {
+                              setAcoesMeta(meta);
+                              setAcoesMenuOpen(true);
+                            }}
+                            style={[styles.moreBtn, { backgroundColor: isDark ? "#0F172A" : "#F8FAFC" }]}
+                          >
+                            <Text style={[styles.moreBtnText, { color: theme.textPrimary }]}>⋯</Text>
+                          </Pressable>
+                        </View>
 
                         <View style={styles.statusBadgesRow}>
                           <View
@@ -739,19 +862,6 @@ export default function ObjetivosScreen() {
                           </View>
                         </View>
                       </View>
-
-                      <Pressable
-                        onPress={() =>
-                          Alert.alert("Ações", `O que deseja fazer com "${meta.nome}"?`, [
-                            { text: "Cancelar", style: "cancel" },
-                            { text: "Editar", onPress: () => abrirEditarMeta(meta) },
-                            { text: "Excluir", style: "destructive", onPress: () => removerMeta(meta) },
-                          ])
-                        }
-                        style={[styles.moreBtn, { backgroundColor: isDark ? "#0F172A" : "#F8FAFC" }]}
-                      >
-                        <Text style={[styles.moreBtnText, { color: theme.textPrimary }]}>⋯</Text>
-                      </Pressable>
 
                     </View>
 
@@ -885,7 +995,7 @@ export default function ObjetivosScreen() {
       </ScrollView>
 
       {celebracaoVisivel && celebracaoPayload && (
-        <View style={styles.celebracaoFullscreen} pointerEvents="auto">
+        <View style={styles.celebracaoFullscreen} pointerEvents="auto" ref={celebracaoRootRef}>
           <Animated.View
             style={[
               styles.celebracaoDim,
@@ -951,7 +1061,31 @@ export default function ObjetivosScreen() {
             ))}
           </View>
 
+          {coletandoPontos && (
+            <View style={styles.pontosColetandoLayer} pointerEvents="none">
+              {moedasColetandoAnim.map((coin, idx) => (
+                <Animated.View
+                  key={`collect-coin-${idx}`}
+                  style={[
+                    styles.pontosCoinPiece,
+                    {
+                      opacity: coin.opacity,
+                      transform: [
+                        { translateX: coin.x },
+                        { translateY: coin.y },
+                        { scale: coin.scale },
+                      ],
+                    },
+                  ]}
+                >
+                  <Text style={styles.coinEmoji}>🪙</Text>
+                </Animated.View>
+              ))}
+            </View>
+          )}
+
           <Animated.View
+            ref={celebracaoPanelRef}
             style={[
               styles.celebracaoPanel,
               {
@@ -982,10 +1116,7 @@ export default function ObjetivosScreen() {
               <View style={styles.celebracaoActionsRow}>
                 <Pressable
                   style={[styles.celebracaoBtn, styles.celebracaoBtnPrimary]}
-                  onPress={() => {
-                    setCelebracaoVisivel(false);
-                    setCelebracaoPayload(null);
-                  }}
+                  onPress={() => coletarPontos()}
                 >
                   <Text style={styles.celebracaoBtnText}>Coletar pontos</Text>
                 </Pressable>
@@ -993,12 +1124,15 @@ export default function ObjetivosScreen() {
                 <Pressable
                   style={[styles.celebracaoBtn, styles.celebracaoBtnGhost]}
                   onPress={() => {
-                    setCelebracaoVisivel(false);
-                    setCelebracaoPayload(null);
-                    setNomeNovaMeta(`Excedente da ${celebracaoPayload.nome}`);
-                    setValorMetaInput(String(celebracaoPayload.excedente));
-                    setDataPrazoInput(celebracaoPayload.dataPrazo);
-                    setAbrirModalCriar(true);
+                    const payload = celebracaoPayload;
+                    if (!payload) return;
+
+                    coletarPontos(() => {
+                      setNomeNovaMeta(`Excedente da ${payload.nome}`);
+                      setValorMetaInput(String(payload.excedente));
+                      setDataPrazoInput(payload.dataPrazo);
+                      setAbrirModalCriar(true);
+                    });
                   }}
                 >
                   <Text style={[styles.celebracaoBtnText, { color: theme.textPrimary }]}>
@@ -1010,10 +1144,7 @@ export default function ObjetivosScreen() {
               <View style={styles.celebracaoActionsRow}>
                 <Pressable
                   style={[styles.celebracaoBtn, styles.celebracaoBtnPrimary]}
-                  onPress={() => {
-                    setCelebracaoVisivel(false);
-                    setCelebracaoPayload(null);
-                  }}
+                  onPress={() => coletarPontos()}
                 >
                   <Text style={styles.celebracaoBtnText}>Coletar pontos</Text>
                 </Pressable>
@@ -1022,6 +1153,52 @@ export default function ObjetivosScreen() {
           </Animated.View>
         </View>
       )}
+
+      <Modal visible={acoesMenuOpen} animationType="fade" transparent onRequestClose={() => setAcoesMenuOpen(false)}>
+        <View style={styles.acoessModalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setAcoesMenuOpen(false)} />
+
+          <View
+            style={[
+              styles.acoessSheet,
+              { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+            ]}
+          >
+            <Text style={[styles.acoessTitle, { color: theme.textPrimary }]}>Ações</Text>
+
+            <Pressable
+              style={[styles.acoessBtn, styles.acoessBtnPrimary]}
+              onPress={() => {
+                const meta = acoesMeta;
+                setAcoesMenuOpen(false);
+                if (meta) abrirEditarMeta(meta);
+              }}
+              disabled={!acoesMeta}
+            >
+              <Text style={styles.acoessBtnPrimaryText}>Editar</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.acoessBtn, styles.acoessBtnDanger]}
+              onPress={() => {
+                const meta = acoesMeta;
+                setAcoesMenuOpen(false);
+                if (meta) removerMeta(meta);
+              }}
+              disabled={!acoesMeta}
+            >
+              <Text style={styles.acoessBtnDangerText}>Excluir</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.acoessBtn, styles.acoessBtnGhost]}
+              onPress={() => setAcoesMenuOpen(false)}
+            >
+              <Text style={[styles.acoessBtnGhostText, { color: theme.textMuted }]}>Cancelar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={abrirModalCriar} animationType="slide" transparent onRequestClose={() => setAbrirModalCriar(false)}>
         <View style={styles.modalOverlay}>
@@ -1304,6 +1481,7 @@ const styles = StyleSheet.create({
   metaCardVencida: { borderColor: "#EF4444", backgroundColor: "#FEF2F2" },
   metaHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10, overflow: "visible" },
   metaInfoCol: { flex: 1, gap: 4 },
+  metaTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   piggyWrap: {
     width: 132,
     height: 150,
@@ -1340,22 +1518,22 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 2,
   },
-  statusBadgesRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2, justifyContent: "space-between" },
+  statusBadgesRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2, justifyContent: "flex-start" },
   statusBadge: {
     flex: 1,
     borderRadius: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     alignItems: "center",
     justifyContent: "center",
   },
-  statusBadgeStatus: { flex: 1.25 },
-  statusBadgeDate: { flex: 0.75 },
+  statusBadgeStatus: { flex: 1.0 },
+  statusBadgeDate: { flex: 1.25 },
   badgeText: { fontWeight: "700", fontSize: 11, lineHeight: 13 },
   statusDateText: { fontSize: 11, fontWeight: "700" },
   pctBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   pctBadgeText: { color: BRAND_MID, fontWeight: "800", fontSize: 12 },
-  metaNome: { color: "#111827", fontWeight: "800", fontSize: 16, lineHeight: 20 },
+  metaNome: { flex: 1, color: "#111827", fontWeight: "800", fontSize: 16, lineHeight: 20 },
   metaPrazo: { fontSize: 11, fontWeight: "600" },
   metaProgressBlock: { gap: 8 },
   progressTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
@@ -1463,6 +1641,68 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   coinEmoji: { fontSize: 12 },
+
+  // Recompensa de pontos (coletar)
+  pontosColetandoLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 5,
+  },
+  pontosCoinPiece: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#FBBF24",
+    borderWidth: 2,
+    borderColor: "#F59E0B",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 6,
+  },
+
+  // Menu (3 pontinhos) - action sheet custom
+  acoessModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.45)",
+    justifyContent: "flex-end",
+    padding: 20,
+  },
+  acoessSheet: {
+    width: "100%",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    gap: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  acoessTitle: { fontSize: 16, fontWeight: "900", marginBottom: 2 },
+  acoessBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  acoessBtnPrimary: { backgroundColor: BRAND_MID },
+  acoessBtnPrimaryText: { color: "#FFFFFF", fontWeight: "900" },
+  acoessBtnDanger: { backgroundColor: "rgba(220,38,38,0.12)" },
+  acoessBtnDangerText: { color: "#DC2626", fontWeight: "900" },
+  acoessBtnGhost: {
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  acoessBtnGhostText: { fontWeight: "900" },
   planCard: { backgroundColor: "#F8FAFC", borderRadius: 12, padding: 10 },
   planTitle: { fontSize: 12, color: "#334155", fontWeight: "700", marginBottom: 4 },
   planLine: { fontSize: 12, color: "#475569", marginTop: 2 },

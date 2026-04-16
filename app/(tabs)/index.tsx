@@ -458,9 +458,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingHorizontal: 20,
     gap: 10,
-    // Evita que a seção "Meta em foco" fique perto demais do topo.
-    marginTop: -6,
-    marginBottom: 8,
+    marginTop: -18,
+    // Mais respiro entre os quadrados de stats e a seção "Meta em foco".
+    marginBottom: 18,
   },
   statCard: {
     flex: 1,
