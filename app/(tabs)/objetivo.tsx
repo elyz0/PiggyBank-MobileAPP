@@ -66,6 +66,8 @@ export default function ObjetivosScreen() {
     ultimoDeposito,
     setUltimoDeposito,
     chapeuEquipado,
+    isDark,
+    alternarTema,
   } = useSaldo();
 
   const [metaExpandidaId, setMetaExpandidaId] = useState<string | null>(null);
@@ -79,6 +81,18 @@ export default function ObjetivosScreen() {
   const [salvando, setSalvando] = useState(false);
   const [, setTicker] = useState(0);
   const piggyScale = useRef(new Animated.Value(1)).current;
+  const theme = {
+    screenBg: isDark ? "#0F172A" : "#ECE7F2",
+    cardBg: isDark ? "#1E293B" : "#FFFFFF",
+    cardBorder: isDark ? "#334155" : "#E2E8F0",
+    textPrimary: isDark ? "#F8FAFC" : "#111827",
+    textMuted: isDark ? "#94A3B8" : "#64748B",
+    planBg: isDark ? "#0F172A" : "#F8FAFC",
+    inputBg: isDark ? "#0F172A" : "#FFFFFF",
+    inputBorder: isDark ? "#475569" : "#CBD5E1",
+    piggyBg: isDark ? "#312E4B" : "#F5EDFF",
+    secondaryBtnBg: isDark ? "#1E3A5F" : "#EFF6FF",
+  };
 
   useEffect(() => {
     const id = setInterval(() => setTicker((prev) => prev + 1), 60000);
@@ -271,26 +285,38 @@ export default function ObjetivosScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.screenBg }]}>
       <StatusBar barStyle="light-content" backgroundColor={BRAND} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.heroBanner}>
           <View style={styles.heroCircle1} />
           <View style={styles.heroCircle2} />
-          <Text style={styles.headerTitulo}>My Goals</Text>
-          <Text style={styles.headerSubtitulo}>Organize e acompanhe suas metas financeiras</Text>
+          <View style={styles.heroTopRow}>
+            <View>
+              <Text style={styles.headerTitulo}>Metas</Text>
+              <Text style={styles.headerSubtitulo}>Organize e acompanhe suas metas financeiras</Text>
+            </View>
+            <View style={styles.heroRightColumn}>
+              <View style={styles.streakBadge}>
+                <Text style={styles.streakLabel}>🔥 {ofensiva} dias</Text>
+              </View>
+              <Pressable style={styles.themeBtn} onPress={alternarTema}>
+                <Text style={styles.themeBtnText}>{isDark ? "☀️ Claro" : "🌙 Escuro"}</Text>
+              </Pressable>
+            </View>
+          </View>
           <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Concluídas</Text>
-              <Text style={styles.statNumero}>{metasConcluidas}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Vencidas</Text>
-              <Text style={styles.statNumero}>{metasVencidas}</Text>
-            </View>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>Pontos</Text>
               <Text style={styles.statNumero}>{pontos}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Metas ativas</Text>
+              <Text style={styles.statNumero}>{metasView.length}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Concluídas</Text>
+              <Text style={styles.statNumero}>{metasConcluidas}</Text>
             </View>
           </View>
           <Text style={styles.totalTexto}>
@@ -299,19 +325,19 @@ export default function ObjetivosScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.secaoTitulo}>Metas</Text>
+          <Text style={[styles.secaoTitulo, { color: theme.textPrimary }]}>Metas</Text>
           <Pressable style={styles.btnPrincipal} onPress={() => setAbrirModalCriar(true)}>
-            <Text style={styles.btnPrincipalTexto}>Add Goal</Text>
+            <Text style={styles.btnPrincipalTexto}>+ Nova meta</Text>
           </Pressable>
         </View>
 
         {carregandoMetas ? (
           <Text style={styles.muted}>Carregando metas...</Text>
         ) : metasView.length === 0 ? (
-          <View style={styles.emptyCard}>
+          <View style={[styles.emptyCard, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
             <Text style={styles.emptyEmoji}>🐷</Text>
-            <Text style={styles.vazioTitulo}>Nenhuma meta criada ainda</Text>
-            <Text style={styles.muted}>Crie sua primeira meta para começar.</Text>
+            <Text style={[styles.vazioTitulo, { color: theme.textPrimary }]}>Nenhuma meta criada ainda</Text>
+            <Text style={[styles.muted, { color: theme.textMuted }]}>Crie sua primeira meta para começar.</Text>
           </View>
         ) : (
           <View style={styles.metasGrid}>
@@ -332,12 +358,13 @@ export default function ObjetivosScreen() {
                   }}
                   style={[
                     styles.metaCard,
+                    { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
                     expandida && styles.metaCardAtiva,
                     meta.status === "vencida" && styles.metaCardVencida,
                   ]}
                 >
                   <View style={styles.metaTop}>
-                    <View style={styles.piggyWrap}>
+                    <View style={[styles.piggyWrap, { backgroundColor: theme.piggyBg }]}>
                       <Piggy
                         scaleAnim={piggyScale}
                         chapeuEquipado={chapeuEquipado || null}
@@ -357,16 +384,18 @@ export default function ObjetivosScreen() {
                     </View>
                   </View>
 
-                  <Text style={styles.metaNome}>{meta.nome}</Text>
-                  <Text style={styles.metaValores}>
+                  <Text style={[styles.metaNome, { color: theme.textPrimary }]}>{meta.nome}</Text>
+                  <Text style={[styles.metaValores, { color: theme.textMuted }]}>
                     {formatarMoeda(meta.valorAtual)} / {formatarMoeda(meta.valorMeta)}
                   </Text>
                   <View style={styles.barraFundo}>
                     <View style={[styles.barraPreenchida, { width: `${Math.round(meta.progresso)}%` }]} />
                   </View>
-                  <Text style={styles.metaPct}>{Math.round(meta.progresso)}% left</Text>
+                  <Text style={[styles.metaPct, { color: theme.textMuted }]}>
+                    {Math.round(meta.progresso)}% concluído
+                  </Text>
 
-                  <View style={styles.planCard}>
+                  <View style={[styles.planCard, { backgroundColor: theme.planBg }]}>
                     <Text style={styles.planTitle}>Plano Original x Ajustado</Text>
                     <Text style={styles.planLine}>
                       Diária: {formatarMoeda(meta.planoOriginal.diario)} | {formatarMoeda(meta.planoAjustado.diario)}
@@ -382,9 +411,17 @@ export default function ObjetivosScreen() {
                   {expandida && (
                     <View style={styles.expandArea}>
                       <TextInput
-                        style={styles.input}
+                        style={[
+                          styles.input,
+                          {
+                            backgroundColor: theme.inputBg,
+                            borderColor: theme.inputBorder,
+                            color: theme.textPrimary,
+                          },
+                        ]}
                         keyboardType="decimal-pad"
                         placeholder="Valor para movimentar"
+                        placeholderTextColor={theme.textMuted}
                         value={valorMovInput[meta.id] ?? ""}
                         onChangeText={(txt) =>
                           setValorMovInput((prev) => ({ ...prev, [meta.id]: txt }))
@@ -392,9 +429,17 @@ export default function ObjetivosScreen() {
                       />
                       <View style={styles.actionsRow}>
                         <Pressable style={[styles.btnPrincipal, styles.flex1]} onPress={() => depositar(meta)} disabled={salvando}>
-                          <Text style={styles.btnPrincipalTexto}>Add Money</Text>
+                          <Text style={styles.btnPrincipalTexto}>Depositar</Text>
                         </Pressable>
-                        <Pressable style={[styles.btnSecundario, styles.flex1]} onPress={() => sacar(meta)} disabled={salvando}>
+                        <Pressable
+                          style={[
+                            styles.btnSecundario,
+                            styles.flex1,
+                            { backgroundColor: theme.secondaryBtnBg },
+                          ]}
+                          onPress={() => sacar(meta)}
+                          disabled={salvando}
+                        >
                           <Text style={styles.btnSecundarioTexto}>Sacar</Text>
                         </Pressable>
                       </View>
@@ -410,44 +455,57 @@ export default function ObjetivosScreen() {
         )}
 
         <View style={styles.historicoCabecalho}>
-          <Text style={styles.secaoTitulo}>Recent Activities</Text>
+          <Text style={styles.secaoTitulo}>Atividades recentes</Text>
           <Pressable onPress={() => setAbrirModalHistorico(true)}>
-            <Text style={styles.verTudo}>View More</Text>
+            <Text style={styles.verTudo}>Ver tudo</Text>
           </Pressable>
         </View>
-        <View style={styles.historyCard}>
+        <View style={[styles.historyCard, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
           {ultimas3.map((item) => (
             <View key={item.id} style={styles.itemTransacao}>
               <View>
-                <Text style={styles.itemTitulo}>
-                  {item.tipo === "deposito" ? "Added to Goal" : item.tipo === "saque" ? "Saque" : "Goal Created"} · {item.metaNome}
+                <Text style={[styles.itemTitulo, { color: theme.textPrimary }]}>
+                  {item.tipo === "deposito"
+                    ? "Adicionado à meta"
+                    : item.tipo === "saque"
+                      ? "Saque"
+                      : "Meta criada"}{" "}
+                  · {item.metaNome}
                 </Text>
-                <Text style={styles.itemSub}>{formatarData(item.dataIso)}</Text>
+                <Text style={[styles.itemSub, { color: theme.textMuted }]}>{formatarData(item.dataIso)}</Text>
               </View>
               <Text style={[styles.itemValor, item.tipo === "saque" ? styles.valorNegativo : styles.valorPositivo]}>
                 {item.tipo === "criacao" ? "-" : `${item.tipo === "saque" ? "-" : "+"}${formatarMoeda(item.valor)}`}
               </Text>
             </View>
           ))}
-          {ultimas3.length === 0 && <Text style={styles.muted}>Ainda não há movimentações.</Text>}
+          {ultimas3.length === 0 && <Text style={[styles.muted, { color: theme.textMuted }]}>Ainda não há movimentações.</Text>}
         </View>
       </ScrollView>
 
       <Modal visible={abrirModalCriar} animationType="slide" transparent onRequestClose={() => setAbrirModalCriar(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.secaoTitulo}>Criar meta (RF01)</Text>
-            <TextInput style={styles.input} placeholder="Nome da meta (ex: Viagem)" value={nomeNovaMeta} onChangeText={setNomeNovaMeta} />
+            <Text style={[styles.secaoTitulo, { color: theme.textPrimary }]}>Criar meta (RF01)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
+              placeholder="Nome da meta (ex: Viagem)"
+              placeholderTextColor={theme.textMuted}
+              value={nomeNovaMeta}
+              onChangeText={setNomeNovaMeta}
+            />
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
               placeholder="Valor total desejado"
+              placeholderTextColor={theme.textMuted}
               keyboardType="decimal-pad"
               value={valorMetaInput}
               onChangeText={setValorMetaInput}
             />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
               placeholder="Prazo (YYYY-MM-DD)"
+              placeholderTextColor={theme.textMuted}
               value={dataPrazoInput}
               onChangeText={setDataPrazoInput}
               autoCapitalize="none"
@@ -467,7 +525,7 @@ export default function ObjetivosScreen() {
             </View>
 
             <View style={styles.actionsRow}>
-              <Pressable style={[styles.btnSecundario, styles.flex1]} onPress={() => setAbrirModalCriar(false)}>
+              <Pressable style={[styles.btnSecundario, styles.flex1, { backgroundColor: theme.secondaryBtnBg }]} onPress={() => setAbrirModalCriar(false)}>
                 <Text style={styles.btnSecundarioTexto}>Cancelar</Text>
               </Pressable>
               <Pressable style={[styles.btnPrincipal, styles.flex1]} onPress={criarNovaMeta} disabled={salvando}>
@@ -481,15 +539,15 @@ export default function ObjetivosScreen() {
       <Modal visible={abrirModalHistorico} animationType="fade" transparent onRequestClose={() => setAbrirModalHistorico(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.secaoTitulo}>Histórico completo</Text>
+            <Text style={[styles.secaoTitulo, { color: theme.textPrimary }]}>Histórico completo</Text>
             <ScrollView style={{ maxHeight: 360 }}>
               {(historicoMetaAtual.length ? historicoMetaAtual : historico).map((item) => (
                 <View key={item.id} style={styles.itemTransacao}>
                   <View>
-                    <Text style={styles.itemTitulo}>
+                    <Text style={[styles.itemTitulo, { color: theme.textPrimary }]}>
                       {item.tipo === "deposito" ? "Depósito" : item.tipo === "saque" ? "Saque" : "Meta criada"} · {item.metaNome}
                     </Text>
-                    <Text style={styles.itemSub}>{formatarData(item.dataIso)}</Text>
+                    <Text style={[styles.itemSub, { color: theme.textMuted }]}>{formatarData(item.dataIso)}</Text>
                   </View>
                   <Text style={[styles.itemValor, item.tipo === "saque" ? styles.valorNegativo : styles.valorPositivo]}>
                     {item.tipo === "criacao" ? "-" : `${item.tipo === "saque" ? "-" : "+"}${formatarMoeda(item.valor)}`}
@@ -512,9 +570,9 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 36 },
   heroBanner: {
     backgroundColor: BRAND,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 40,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     overflow: "hidden",
@@ -539,15 +597,47 @@ const styles = StyleSheet.create({
     bottom: -42,
     left: 12,
   },
-  headerTitulo: { color: "#fff", fontSize: 24, fontWeight: "800" },
-  headerSubtitulo: { color: "rgba(255,255,255,0.7)", marginTop: 3, marginBottom: 14 },
+  heroTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 28,
+  },
+  heroRightColumn: { alignItems: "flex-end", gap: 8 },
+  headerTitulo: { color: "#fff", fontSize: 30, fontWeight: "700" },
+  streakBadge: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    borderRadius: 24,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  streakLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
+  themeBtn: {
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  themeBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
+  headerSubtitulo: { color: "rgba(255,255,255,0.7)", marginTop: 3 },
   statsRow: { flexDirection: "row", gap: 8 },
-  statCard: { flex: 1, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 12, padding: 10 },
+  statCard: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
   statLabel: { color: "rgba(255,255,255,0.7)", fontSize: 11 },
-  statNumero: { color: "#fff", fontWeight: "800", marginTop: 2 },
+  statNumero: { color: "#fff", fontWeight: "800", marginTop: 2, fontSize: 16 },
   totalTexto: { color: "#fff", marginTop: 10, fontWeight: "700" },
   sectionHeader: {
-    marginTop: 18,
+    marginTop: 24,
     paddingHorizontal: 20,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -582,7 +672,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
     padding: 16,
-    minHeight: 250,
+    minHeight: 220,
   },
   metaCardAtiva: { borderColor: BRAND_LIGHT, shadowColor: BRAND_LIGHT, shadowOpacity: 0.18, shadowRadius: 10, elevation: 4 },
   metaCardVencida: { borderColor: "#EF4444", backgroundColor: "#FEF2F2" },
@@ -634,7 +724,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 24,
     paddingHorizontal: 20,
   },
   verTudo: { color: BRAND_LIGHT, fontWeight: "700" },

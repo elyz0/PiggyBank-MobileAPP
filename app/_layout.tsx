@@ -5,6 +5,7 @@ import {
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -47,6 +48,9 @@ export interface SaldoContextData {
   setMetas: React.Dispatch<React.SetStateAction<Meta[]>>;
   metaAtivaId: string | null;
   setMetaAtivaId: React.Dispatch<React.SetStateAction<string | null>>;
+  tema: "light" | "dark";
+  isDark: boolean;
+  alternarTema: () => Promise<void>;
 }
 
 // ─── Contexto ─────────────────────────────────────────────────────────────────
@@ -80,11 +84,18 @@ export default function RootLayout() {
   const [metas, setMetas] = useState<Meta[]>([]);
   const [metaAtivaId, setMetaAtivaId] = useState<string | null>(null);
   const [carregandoMetas, setCarregandoMetas] = useState(true);
+  const [tema, setTema] = useState<"light" | "dark">(
+    colorScheme === "dark" ? "dark" : "light",
+  );
 
   // Carrega metas do armazenamento e prepara o app
   useEffect(() => {
     async function prepare() {
       try {
+        const temaSalvo = await AsyncStorage.getItem("@piggybank:tema");
+        if (temaSalvo === "light" || temaSalvo === "dark") {
+          setTema(temaSalvo);
+        }
         const metasSalvas = await getAllMetas();
         setMetas(metasSalvas);
         setMetaAtivaId((current) => current ?? metasSalvas[0]?.id ?? null);
@@ -97,6 +108,12 @@ export default function RootLayout() {
     }
     prepare();
   }, []);
+
+  const alternarTema = async () => {
+    const proximo: "light" | "dark" = tema === "dark" ? "light" : "dark";
+    setTema(proximo);
+    await AsyncStorage.setItem("@piggybank:tema", proximo);
+  };
 
   const refreshMetas = async () => {
     const metasSalvas = await getAllMetas();
@@ -146,7 +163,7 @@ export default function RootLayout() {
 
   // Renderização final do aplicativo
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={tema === "dark" ? DarkTheme : DefaultTheme}>
       <SaldoContext.Provider
         value={{
           pontos,
@@ -169,6 +186,9 @@ export default function RootLayout() {
           setMetas,
           metaAtivaId,
           setMetaAtivaId,
+          tema,
+          isDark: tema === "dark",
+          alternarTema,
         }}
       >
         <Stack initialRouteName="(tabs)">

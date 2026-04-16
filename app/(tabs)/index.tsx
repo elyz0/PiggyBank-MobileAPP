@@ -5,12 +5,12 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef } from "react";
 import {
   Animated,
+  FlatList,
   Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
 } from "react-native";
 
@@ -149,18 +149,78 @@ function MetaProgressCard({
   );
 }
 
+function MetaCarouselCard({
+  nome,
+  guardado,
+  total,
+  onPress,
+  isDark,
+  piggyScale,
+  chapeuEquipado,
+}: any) {
+  const progresso = total > 0 ? Math.min(guardado / total, 1) : 0;
+  const pct = Math.round(progresso * 100);
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.carouselCard,
+        isDark ? styles.bgDarkCard : styles.bgLight,
+        pressed && styles.metaCardPressed,
+      ]}
+      onPress={onPress}
+    >
+      <View style={[styles.carouselPiggyWrap, isDark && styles.carouselPiggyWrapDark]}>
+        <Piggy scaleAnim={piggyScale} chapeuEquipado={chapeuEquipado ?? null} />
+      </View>
+      <Text
+        style={[styles.carouselNome, isDark ? styles.textWhite : styles.textBlack]}
+        numberOfLines={1}
+      >
+        {nome}
+      </Text>
+      <Text
+        style={[
+          styles.carouselSub,
+          isDark ? styles.textMutedDark : styles.textMutedLight,
+        ]}
+      >
+        {pct}% concluído
+      </Text>
+      <View style={[styles.progressBg, isDark && { backgroundColor: "#334155" }]}>
+        <View style={[styles.progressFill, { width: `${pct}%` }]} />
+      </View>
+      <Text
+        style={[
+          styles.carouselValor,
+          isDark ? styles.textWhite : styles.textBlack,
+        ]}
+      >
+        {formatCurrency(guardado)} / {formatCurrency(total)}
+      </Text>
+    </Pressable>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
 
   // Animated.Value estático para o Piggy (sem animação ativa aqui)
   const piggyScale = useRef(new Animated.Value(1)).current;
 
-  const { pontos, ofensiva, metas, metaAtivaId, ultimoDeposito, setOfensiva } =
-    useSaldo();
+  const {
+    pontos,
+    ofensiva,
+    metas,
+    metaAtivaId,
+    ultimoDeposito,
+    setOfensiva,
+    chapeuEquipado,
+    isDark,
+    alternarTema,
+  } = useSaldo();
 
   useEffect(() => {
     if (!ultimoDeposito) return;
@@ -205,10 +265,15 @@ export default function HomeScreen() {
             <View>
               <Text style={styles.heroGreeting}>{getGreeting()}</Text>
             </View>
-            <View style={styles.streakBadge}>
-              <Text style={styles.streakFire}>🔥</Text>
-              <Text style={styles.streakNum}>{ofensiva}</Text>
-              <Text style={styles.streakLabel}>dias</Text>
+            <View style={styles.heroRightColumn}>
+              <View style={styles.streakBadge}>
+                <Text style={styles.streakFire}>🔥</Text>
+                <Text style={styles.streakNum}>{ofensiva}</Text>
+                <Text style={styles.streakLabel}>dias</Text>
+              </View>
+              <Pressable style={styles.themeBtn} onPress={alternarTema}>
+                <Text style={styles.themeBtnText}>{isDark ? "☀️ Claro" : "🌙 Escuro"}</Text>
+              </Pressable>
             </View>
           </View>
           <View style={styles.balanceBlock}>
@@ -248,7 +313,7 @@ export default function HomeScreen() {
           />
         </View>
 
-        {metaAtiva && (
+        {(metas || []).length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text
@@ -263,13 +328,25 @@ export default function HomeScreen() {
                 <Text style={styles.sectionLink}>Ver todas →</Text>
               </Pressable>
             </View>
-            <MetaProgressCard
-              nome={metaAtiva.nome}
-              emoji={metaAtiva.emoji}
-              guardado={metaAtiva.valorAtual}
-              total={metaAtiva.valorMeta}
-              onPress={() => router.push("/objetivo")}
-              isDark={isDark}
+            <FlatList
+              data={metas || []}
+              horizontal
+              keyExtractor={(item) => item.id}
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToAlignment="start"
+              contentContainerStyle={styles.carouselList}
+              renderItem={({ item }) => (
+                <MetaCarouselCard
+                  nome={item.nome}
+                  guardado={item.valorAtual}
+                  total={item.valorMeta}
+                  isDark={isDark}
+                  onPress={() => router.push("/objetivo")}
+                  piggyScale={piggyScale}
+                  chapeuEquipado={chapeuEquipado}
+                />
+              )}
             />
           </View>
         )}
@@ -418,6 +495,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 32,
   },
+  heroRightColumn: { alignItems: "flex-end", gap: 8 },
   heroGreeting: { fontSize: 30, fontWeight: "700", color: "#fff" },
   heroSub: { fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 3 },
   streakBadge: {
@@ -434,6 +512,17 @@ const styles = StyleSheet.create({
   streakFire: { fontSize: 16 },
   streakNum: { fontSize: 16, fontWeight: "800", color: "#FCD34D" },
   streakLabel: { fontSize: 12, color: "rgba(255,255,255,0.6)" },
+  themeBtn: {
+    marginTop: 8,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    alignSelf: "flex-end",
+  },
+  themeBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
   balanceBlock: { alignItems: "flex-start" },
   balanceLabel: {
     fontSize: 10,
@@ -496,6 +585,29 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 17, fontWeight: "800", letterSpacing: -0.2 },
   sectionLink: { fontSize: 13, color: BRAND_LIGHT, fontWeight: "600" },
+  carouselList: { paddingRight: 20, gap: 12 },
+  carouselCard: {
+    width: 220,
+    borderRadius: 20,
+    padding: 14,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+  },
+  carouselPiggyWrap: {
+    height: 108,
+    borderRadius: 16,
+    backgroundColor: "#F5EDFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  carouselPiggyWrapDark: { backgroundColor: "#312E4B" },
+  carouselNome: { fontSize: 15, fontWeight: "800" },
+  carouselSub: { fontSize: 12, marginTop: 3, marginBottom: 8 },
+  carouselValor: { fontSize: 12, fontWeight: "700", marginTop: 8 },
 
   metaCard: {
     borderRadius: 20,

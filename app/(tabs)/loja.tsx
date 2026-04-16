@@ -129,6 +129,7 @@ function ProdutoCard({
   podeComprar,
   onComprar,
   onEquipar,
+  isDark,
 }: {
   produto: Produto;
   comprado: boolean;
@@ -136,6 +137,7 @@ function ProdutoCard({
   podeComprar: boolean;
   onComprar: () => void;
   onEquipar: () => void;
+  isDark: boolean;
 }) {
   const categoriaLabel =
     produto.categoria === "chapeu"
@@ -148,13 +150,14 @@ function ProdutoCard({
     <View
       style={[
         styles.card,
+        isDark && { backgroundColor: "#1E293B", borderColor: "#334155" },
         produto.destaque && styles.cardDestaque,
         equipado && styles.cardEquipado,
       ]}
     >
       {produto.destaque && (
         <View style={styles.destaqueTag}>
-          <Text style={styles.destaqueTagText}>⭐ Popular</Text>
+          <Text style={styles.destaqueTagText}>⭐ Destaque</Text>
         </View>
       )}
 
@@ -167,8 +170,8 @@ function ProdutoCard({
         </View>
       </View>
 
-      <Text style={styles.cardNome}>{produto.nome}</Text>
-      <Text style={styles.cardDesc}>{produto.descricao}</Text>
+      <Text style={[styles.cardNome, isDark && { color: "#F8FAFC" }]}>{produto.nome}</Text>
+      <Text style={[styles.cardDesc, isDark && { color: "#94A3B8" }]}>{produto.descricao}</Text>
 
       <View style={styles.cardFooter}>
         <View style={styles.precoRow}>
@@ -219,6 +222,8 @@ export default function LojaScreen() {
     setChapeuEquipado,
     recuperadoresOfensiva,
     setRecuperadoresOfensiva,
+    isDark,
+    alternarTema,
   } = useSaldo();
 
   const [categoriaAtiva, setCategoriaAtiva] = useState<string>("todos");
@@ -276,22 +281,27 @@ export default function LojaScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDark && { backgroundColor: "#0F172A" }]}>
       <View style={styles.heroBanner}>
         <View style={styles.heroCircle1} />
         <View style={styles.heroCircle2} />
         {/* ── Header ── */}
         <View style={styles.header}>
           <Pressable style={styles.backBtn} onPress={handleBack}>
-            <Text style={styles.backBtnText}>← Voltar</Text>
+            <Text style={[styles.backBtnText, isDark && { color: "#FFFFFF" }]}>← Voltar</Text>
           </Pressable>
           <View>
             <Text style={styles.headerTitle}>Loja</Text>
             <Text style={styles.headerSub}>Gaste seus pontos com sabedoria</Text>
           </View>
-          <View style={styles.pontosChip}>
-            <Text style={styles.pontosEmoji}>⭐</Text>
-            <Text style={styles.pontosValor}>{pontos}</Text>
+          <View style={styles.heroRightColumn}>
+            <View style={styles.pontosChip}>
+              <Text style={styles.pontosEmoji}>⭐</Text>
+              <Text style={styles.pontosValor}>{pontos}</Text>
+            </View>
+            <Pressable style={styles.themeBtn} onPress={alternarTema}>
+              <Text style={styles.themeBtnText}>{isDark ? "☀️ Claro" : "🌙 Escuro"}</Text>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -307,6 +317,7 @@ export default function LojaScreen() {
             key={cat.id}
             style={[
               styles.filtroBtn,
+              isDark && { backgroundColor: "#1E293B", borderColor: "#334155" },
               categoriaAtiva === cat.id && styles.filtroBtnAtivo,
             ]}
             onPress={() => setCategoriaAtiva(cat.id)}
@@ -315,6 +326,7 @@ export default function LojaScreen() {
             <Text
               style={[
                 styles.filtroLabel,
+                isDark && { color: "#94A3B8" },
                 categoriaAtiva === cat.id && styles.filtroLabelAtivo,
               ]}
             >
@@ -339,6 +351,7 @@ export default function LojaScreen() {
               podeComprar={pontos >= produto.preco}
               onComprar={() => setModalItem(produto)}
               onEquipar={() => equipar(produto.id)}
+              isDark={isDark}
             />
           ))}
         </View>
@@ -355,17 +368,17 @@ export default function LojaScreen() {
           style={styles.modalOverlay}
           onPress={() => setModalItem(null)}
         >
-          <View style={styles.modalBox}>
+          <View style={[styles.modalBox, isDark && { backgroundColor: "#1E293B", borderColor: "#334155" }]}>
             <Text style={styles.modalEmoji}>{modalItem?.emoji}</Text>
-            <Text style={styles.modalNome}>{modalItem?.nome}</Text>
-            <Text style={styles.modalDesc}>{modalItem?.descricao}</Text>
+            <Text style={[styles.modalNome, isDark && { color: "#F8FAFC" }]}>{modalItem?.nome}</Text>
+            <Text style={[styles.modalDesc, isDark && { color: "#94A3B8" }]}>{modalItem?.descricao}</Text>
 
             <View style={styles.modalPrecoRow}>
-              <Text style={styles.modalPrecoLabel}>Custo:</Text>
+              <Text style={[styles.modalPrecoLabel, isDark && { color: "#94A3B8" }]}>Custo:</Text>
               <Text style={styles.modalPreco}>⭐ {modalItem?.preco}</Text>
             </View>
             <View style={styles.modalPrecoRow}>
-              <Text style={styles.modalPrecoLabel}>Seus pontos:</Text>
+              <Text style={[styles.modalPrecoLabel, isDark && { color: "#94A3B8" }]}>Seus pontos:</Text>
               <Text
                 style={[
                   styles.modalPreco,
@@ -380,10 +393,10 @@ export default function LojaScreen() {
 
             <View style={styles.modalBtns}>
               <Pressable
-                style={styles.modalBtnCancelar}
+                style={[styles.modalBtnCancelar, isDark && { backgroundColor: "#0F172A" }]}
                 onPress={() => setModalItem(null)}
               >
-                <Text style={styles.modalBtnCancelarText}>Cancelar</Text>
+                <Text style={[styles.modalBtnCancelarText, isDark && { color: "#CBD5E1" }]}>Cancelar</Text>
               </Pressable>
               <Pressable
                 style={[
@@ -395,8 +408,8 @@ export default function LojaScreen() {
               >
                 <Text style={styles.modalBtnConfirmarText}>
                   {(modalItem?.preco ?? 0) > pontos
-                    ? "Pontos Insuficientes"
-                    : "Confirmar Compra"}
+                    ? "Pontos insuficientes"
+                    : "Confirmar compra"}
                 </Text>
               </Pressable>
             </View>
@@ -409,13 +422,14 @@ export default function LojaScreen() {
         <View
           style={[
             styles.toast,
+            isDark && { backgroundColor: "#1E293B" },
             toastMsg.includes("❌") && {
               borderColor: COR.red,
               backgroundColor: "#2A1010",
             },
           ]}
         >
-          <Text style={styles.toastText}>{toastMsg}</Text>
+          <Text style={[styles.toastText, isDark && { color: "#F8FAFC" }]}>{toastMsg}</Text>
         </View>
       )}
     </View>
@@ -462,6 +476,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
+  heroRightColumn: { alignItems: "flex-end", gap: 8 },
   backBtn: {
     backgroundColor: "rgba(255,255,255,0.12)",
     borderRadius: 12,
@@ -482,6 +497,16 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.7)",
     textAlign: "center",
   },
+  themeBtn: {
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  themeBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 12 },
   pontosChip: {
     flexDirection: "row",
     alignItems: "center",
