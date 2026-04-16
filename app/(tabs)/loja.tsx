@@ -220,7 +220,6 @@ export default function LojaScreen() {
     setChapeusComprados,
     chapeuEquipado,
     setChapeuEquipado,
-    recuperadoresOfensiva,
     setRecuperadoresOfensiva,
     isDark,
     alternarTema,

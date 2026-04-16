@@ -9,6 +9,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Alert,
+  FlatList,
   Modal,
   Pressable,
   SafeAreaView,
@@ -17,6 +18,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -51,7 +53,29 @@ function parseNumber(texto: string): number {
   return Number(texto.replace(",", "."));
 }
 
+function StatCard({ emoji, label, value, accent, isDark }: any) {
+  return (
+    <View style={[styles.statCardGrid, isDark ? styles.bgDarkCard : styles.bgLight]}>
+      <View style={[styles.statIconWrap, { backgroundColor: accent + "22" }]}>
+        <Text style={styles.statEmoji}>{emoji}</Text>
+      </View>
+      <Text style={[styles.statValue, isDark ? styles.textWhite : styles.textBlack]}>
+        {value}
+      </Text>
+      <Text
+        style={[
+          styles.statLabelGrid,
+          isDark ? styles.textMutedDark : styles.textMutedLight,
+        ]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 export default function ObjetivosScreen() {
+  const { height: screenHeight } = useWindowDimensions();
   const {
     metas,
     setMetas,
@@ -80,7 +104,7 @@ export default function ObjetivosScreen() {
   const [abrirModalHistorico, setAbrirModalHistorico] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [, setTicker] = useState(0);
-  const piggyScale = useRef(new Animated.Value(1)).current;
+  const piggyScaleCard = useRef(new Animated.Value(0.9)).current;
   const theme = {
     screenBg: isDark ? "#0F172A" : "#ECE7F2",
     cardBg: isDark ? "#1E293B" : "#FFFFFF",
@@ -142,7 +166,6 @@ export default function ObjetivosScreen() {
   const totalGuardado = metas.reduce((acc, m) => acc + m.valorAtual, 0);
   const totalMeta = metas.reduce((acc, m) => acc + m.valorMeta, 0);
   const metasConcluidas = metasView.filter((m) => m.status === "concluida").length;
-  const metasVencidas = metasView.filter((m) => m.status === "vencida").length;
 
   const historicoMetaAtual = metaExpandidaId
     ? historico.filter((h) => h.metaId === metaExpandidaId)
@@ -305,23 +328,33 @@ export default function ObjetivosScreen() {
               </Pressable>
             </View>
           </View>
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Pontos</Text>
-              <Text style={styles.statNumero}>{pontos}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Metas ativas</Text>
-              <Text style={styles.statNumero}>{metasView.length}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Concluídas</Text>
-              <Text style={styles.statNumero}>{metasConcluidas}</Text>
-            </View>
-          </View>
           <Text style={styles.totalTexto}>
             {formatarMoeda(totalGuardado)} de {formatarMoeda(totalMeta)}
           </Text>
+        </View>
+
+        <View style={styles.statsGrid}>
+          <StatCard
+            emoji="⭐"
+            label="Pontos"
+            value={pontos.toLocaleString("pt-BR")}
+            accent="#F59E0B"
+            isDark={isDark}
+          />
+          <StatCard
+            emoji="🎯"
+            label="Metas ativas"
+            value={String(metasView.length)}
+            accent="#3B82F6"
+            isDark={isDark}
+          />
+          <StatCard
+            emoji="✅"
+            label="Concluídas"
+            value={String(metasConcluidas)}
+            accent="#10B981"
+            isDark={isDark}
+          />
         </View>
 
         <View style={styles.sectionHeader}>
@@ -340,117 +373,132 @@ export default function ObjetivosScreen() {
             <Text style={[styles.muted, { color: theme.textMuted }]}>Crie sua primeira meta para começar.</Text>
           </View>
         ) : (
-          <View style={styles.metasGrid}>
-            {metasView.map((meta) => {
-              const expandida = meta.id === metaExpandidaId;
-              const statusLabel =
-                meta.status === "concluida"
-                  ? "Concluída"
-                  : meta.status === "vencida"
-                    ? "Vencida"
-                    : "Em andamento";
-              return (
-                <Pressable
-                  key={meta.id}
-                  onPress={() => {
-                    setMetaExpandidaId((prev) => (prev === meta.id ? null : meta.id));
-                    setMetaAtivaId(meta.id);
-                  }}
-                  style={[
-                    styles.metaCard,
-                    { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
-                    expandida && styles.metaCardAtiva,
-                    meta.status === "vencida" && styles.metaCardVencida,
-                  ]}
-                >
-                  <View style={styles.metaTop}>
-                    <View style={[styles.piggyWrap, { backgroundColor: theme.piggyBg }]}>
-                      <Piggy
-                        scaleAnim={piggyScale}
-                        chapeuEquipado={chapeuEquipado || null}
-                      />
-                    </View>
-                    <View
-                      style={[
-                        styles.statusTag,
-                        meta.status === "concluida"
-                          ? styles.statusConcluida
-                          : meta.status === "vencida"
-                            ? styles.statusVencida
-                            : styles.statusAndamento,
-                      ]}
-                    >
-                      <Text style={styles.statusText}>{statusLabel}</Text>
-                    </View>
-                  </View>
+          <View
+            style={[
+              styles.metasListContainer,
+              { maxHeight: Math.min(560, Math.max(280, Math.round(screenHeight * 0.48))) },
+            ]}
+          >
+            <FlatList
+              data={metasView}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+              contentContainerStyle={styles.metasListContent}
+              renderItem={({ item: meta }) => {
+                const expandida = meta.id === metaExpandidaId;
+                const statusLabel =
+                  meta.status === "concluida"
+                    ? "Concluída"
+                    : meta.status === "vencida"
+                      ? "Vencida"
+                      : "Em andamento";
 
-                  <Text style={[styles.metaNome, { color: theme.textPrimary }]}>{meta.nome}</Text>
-                  <Text style={[styles.metaValores, { color: theme.textMuted }]}>
-                    {formatarMoeda(meta.valorAtual)} / {formatarMoeda(meta.valorMeta)}
-                  </Text>
-                  <View style={styles.barraFundo}>
-                    <View style={[styles.barraPreenchida, { width: `${Math.round(meta.progresso)}%` }]} />
-                  </View>
-                  <Text style={[styles.metaPct, { color: theme.textMuted }]}>
-                    {Math.round(meta.progresso)}% concluído
-                  </Text>
-
-                  <View style={[styles.planCard, { backgroundColor: theme.planBg }]}>
-                    <Text style={styles.planTitle}>Plano Original x Ajustado</Text>
-                    <Text style={styles.planLine}>
-                      Diária: {formatarMoeda(meta.planoOriginal.diario)} | {formatarMoeda(meta.planoAjustado.diario)}
-                    </Text>
-                    <Text style={styles.planLine}>
-                      Semanal: {formatarMoeda(meta.planoOriginal.semanal)} | {formatarMoeda(meta.planoAjustado.semanal)}
-                    </Text>
-                    <Text style={styles.planLine}>
-                      Mensal: {formatarMoeda(meta.planoOriginal.mensal)} | {formatarMoeda(meta.planoAjustado.mensal)}
-                    </Text>
-                  </View>
-
-                  {expandida && (
-                    <View style={styles.expandArea}>
-                      <TextInput
+                return (
+                  <Pressable
+                    onPress={() => {
+                      setMetaExpandidaId((prev) => (prev === meta.id ? null : meta.id));
+                      setMetaAtivaId(meta.id);
+                    }}
+                    style={[
+                      styles.metaCard,
+                      { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+                      expandida && styles.metaCardAtiva,
+                      meta.status === "vencida" && styles.metaCardVencida,
+                    ]}
+                  >
+                    <View style={styles.metaTop}>
+                      <View style={[styles.piggyWrap, { backgroundColor: theme.piggyBg }]}>
+                        <Piggy scaleAnim={piggyScaleCard} chapeuEquipado={chapeuEquipado || null} />
+                      </View>
+                      <View
                         style={[
-                          styles.input,
-                          {
-                            backgroundColor: theme.inputBg,
-                            borderColor: theme.inputBorder,
-                            color: theme.textPrimary,
-                          },
+                          styles.statusTag,
+                          meta.status === "concluida"
+                            ? styles.statusConcluida
+                            : meta.status === "vencida"
+                              ? styles.statusVencida
+                              : styles.statusAndamento,
                         ]}
-                        keyboardType="decimal-pad"
-                        placeholder="Valor para movimentar"
-                        placeholderTextColor={theme.textMuted}
-                        value={valorMovInput[meta.id] ?? ""}
-                        onChangeText={(txt) =>
-                          setValorMovInput((prev) => ({ ...prev, [meta.id]: txt }))
-                        }
-                      />
-                      <View style={styles.actionsRow}>
-                        <Pressable style={[styles.btnPrincipal, styles.flex1]} onPress={() => depositar(meta)} disabled={salvando}>
-                          <Text style={styles.btnPrincipalTexto}>Depositar</Text>
-                        </Pressable>
-                        <Pressable
+                      >
+                        <Text style={styles.statusText}>{statusLabel}</Text>
+                      </View>
+                    </View>
+
+                    <Text style={[styles.metaNome, { color: theme.textPrimary }]}>{meta.nome}</Text>
+                    <Text style={[styles.metaValores, { color: theme.textMuted }]}>
+                      {formatarMoeda(meta.valorAtual)} / {formatarMoeda(meta.valorMeta)}
+                    </Text>
+                    <View style={styles.barraFundo}>
+                      <View style={[styles.barraPreenchida, { width: `${Math.round(meta.progresso)}%` }]} />
+                    </View>
+                    <Text style={[styles.metaPct, { color: theme.textMuted }]}>
+                      {Math.round(meta.progresso)}% concluído
+                    </Text>
+
+                    <View style={[styles.planCard, { backgroundColor: theme.planBg }]}>
+                      <Text style={[styles.planTitle, { color: theme.textPrimary }]}>
+                        Plano Original x Ajustado
+                      </Text>
+                      <Text style={[styles.planLine, { color: theme.textMuted }]}>
+                        Diária: {formatarMoeda(meta.planoOriginal.diario)} | {formatarMoeda(meta.planoAjustado.diario)}
+                      </Text>
+                      <Text style={[styles.planLine, { color: theme.textMuted }]}>
+                        Semanal: {formatarMoeda(meta.planoOriginal.semanal)} | {formatarMoeda(meta.planoAjustado.semanal)}
+                      </Text>
+                      <Text style={[styles.planLine, { color: theme.textMuted }]}>
+                        Mensal: {formatarMoeda(meta.planoOriginal.mensal)} | {formatarMoeda(meta.planoAjustado.mensal)}
+                      </Text>
+                    </View>
+
+                    {expandida && (
+                      <View style={styles.expandArea}>
+                        <TextInput
                           style={[
-                            styles.btnSecundario,
-                            styles.flex1,
-                            { backgroundColor: theme.secondaryBtnBg },
+                            styles.input,
+                            {
+                              backgroundColor: theme.inputBg,
+                              borderColor: theme.inputBorder,
+                              color: theme.textPrimary,
+                            },
                           ]}
-                          onPress={() => sacar(meta)}
-                          disabled={salvando}
-                        >
-                          <Text style={styles.btnSecundarioTexto}>Sacar</Text>
+                          keyboardType="decimal-pad"
+                          placeholder="Valor para movimentar"
+                          placeholderTextColor={theme.textMuted}
+                          value={valorMovInput[meta.id] ?? ""}
+                          onChangeText={(txt) =>
+                            setValorMovInput((prev) => ({ ...prev, [meta.id]: txt }))
+                          }
+                        />
+                        <View style={styles.actionsRow}>
+                          <Pressable
+                            style={[styles.btnPrincipal, styles.flex1]}
+                            onPress={() => depositar(meta)}
+                            disabled={salvando}
+                          >
+                            <Text style={styles.btnPrincipalTexto}>Depositar</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.btnSecundario,
+                              styles.flex1,
+                              { backgroundColor: theme.secondaryBtnBg },
+                            ]}
+                            onPress={() => sacar(meta)}
+                            disabled={salvando}
+                          >
+                            <Text style={styles.btnSecundarioTexto}>Sacar</Text>
+                          </Pressable>
+                        </View>
+                        <Pressable onPress={() => removerMeta(meta)}>
+                          <Text style={styles.btnDeleteTexto}>Excluir meta</Text>
                         </Pressable>
                       </View>
-                      <Pressable onPress={() => removerMeta(meta)}>
-                        <Text style={styles.btnDeleteTexto}>Excluir meta</Text>
-                      </Pressable>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
+                    )}
+                  </Pressable>
+                );
+              }}
+            />
           </View>
         )}
 
@@ -485,7 +533,7 @@ export default function ObjetivosScreen() {
 
       <Modal visible={abrirModalCriar} animationType="slide" transparent onRequestClose={() => setAbrirModalCriar(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+          <View style={[styles.modalBox, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
             <Text style={[styles.secaoTitulo, { color: theme.textPrimary }]}>Criar meta (RF01)</Text>
             <TextInput
               style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
@@ -511,15 +559,15 @@ export default function ObjetivosScreen() {
               autoCapitalize="none"
             />
 
-            <View style={styles.planPreview}>
-              <Text style={styles.planTitle}>Sugestão de economia (RF02)</Text>
-              <Text style={styles.planLine}>
+            <View style={[styles.planPreview, { backgroundColor: theme.planBg, borderColor: theme.cardBorder }]}>
+              <Text style={[styles.planTitle, { color: theme.textPrimary }]}>Sugestão de economia (RF02)</Text>
+              <Text style={[styles.planLine, { color: theme.textMuted }]}>
                 Economia Diária: {planoCriacao ? formatarMoeda(planoCriacao.diario) : "-"}
               </Text>
-              <Text style={styles.planLine}>
+              <Text style={[styles.planLine, { color: theme.textMuted }]}>
                 Desafio Semanal: {planoCriacao ? formatarMoeda(planoCriacao.semanal) : "-"}
               </Text>
-              <Text style={styles.planLine}>
+              <Text style={[styles.planLine, { color: theme.textMuted }]}>
                 Corte de Gastos Mensal: {planoCriacao ? formatarMoeda(planoCriacao.mensal) : "-"}
               </Text>
             </View>
@@ -538,7 +586,7 @@ export default function ObjetivosScreen() {
 
       <Modal visible={abrirModalHistorico} animationType="fade" transparent onRequestClose={() => setAbrirModalHistorico(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+          <View style={[styles.modalBox, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
             <Text style={[styles.secaoTitulo, { color: theme.textPrimary }]}>Histórico completo</Text>
             <ScrollView style={{ maxHeight: 360 }}>
               {(historicoMetaAtual.length ? historicoMetaAtual : historico).map((item) => (
@@ -568,6 +616,12 @@ export default function ObjetivosScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#ECE7F2" },
   scroll: { paddingBottom: 36 },
+  bgLight: { backgroundColor: "#FFFFFF" },
+  bgDarkCard: { backgroundColor: "#1E293B" },
+  textBlack: { color: "#111827" },
+  textWhite: { color: "#FFFFFF" },
+  textMutedLight: { color: "#94A3B8" },
+  textMutedDark: { color: "#64748B" },
   heroBanner: {
     backgroundColor: BRAND,
     paddingHorizontal: 24,
@@ -625,17 +679,36 @@ const styles = StyleSheet.create({
   },
   themeBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
   headerSubtitulo: { color: "rgba(255,255,255,0.7)", marginTop: 3 },
-  statsRow: { flexDirection: "row", gap: 8 },
-  statCard: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  statLabel: { color: "rgba(255,255,255,0.7)", fontSize: 11 },
-  statNumero: { color: "#fff", fontWeight: "800", marginTop: 2, fontSize: 16 },
   totalTexto: { color: "#fff", marginTop: 10, fontWeight: "700" },
+  statsGrid: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 10,
+    marginTop: -18,
+    marginBottom: 8,
+  },
+  statCardGrid: {
+    flex: 1,
+    borderRadius: 18,
+    padding: 14,
+    alignItems: "center",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  statIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  statEmoji: { fontSize: 20 },
+  statValue: { fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
+  statLabelGrid: { fontSize: 10, marginTop: 2, textAlign: "center" },
   sectionHeader: {
     marginTop: 24,
     paddingHorizontal: 20,
@@ -665,7 +738,8 @@ const styles = StyleSheet.create({
   },
   emptyEmoji: { fontSize: 42, marginBottom: 8 },
   vazioTitulo: { color: "#111827", fontSize: 16, fontWeight: "700" },
-  metasGrid: { paddingHorizontal: 20, gap: 14, marginTop: 12 },
+  metasListContainer: { paddingHorizontal: 20, marginTop: 12 },
+  metasListContent: { gap: 14, paddingBottom: 6 },
   metaCard: {
     backgroundColor: "#fff",
     borderRadius: 22,
@@ -678,8 +752,8 @@ const styles = StyleSheet.create({
   metaCardVencida: { borderColor: "#EF4444", backgroundColor: "#FEF2F2" },
   metaTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   piggyWrap: {
-    width: 124,
-    height: 104,
+    width: 140,
+    height: 128,
     borderRadius: 20,
     backgroundColor: "#F5EDFF",
     alignItems: "center",
@@ -764,5 +838,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
-  planPreview: { marginTop: 12, backgroundColor: "#F8FAFC", borderRadius: 12, padding: 10 },
+  planPreview: {
+    marginTop: 12,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
 });
