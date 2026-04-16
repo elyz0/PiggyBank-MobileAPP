@@ -63,6 +63,7 @@ export async function createMeta(
     valorAtual: 0,
     dataPrazo,
     dataCriacao: new Date().toISOString(),
+    chapeuEquipadoId: null,
     planoOriginal,
   };
 

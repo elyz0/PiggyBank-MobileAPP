@@ -10,6 +10,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { AppState } from "react-native";
 import "react-native-reanimated";
 
 // Importe o seu componente de animação (certifique-se que o caminho está correto)
@@ -123,6 +124,16 @@ export default function RootLayout() {
     AsyncStorage.setItem(PONTOS_KEY, String(pontos)).catch(() => {
       // evita quebrar UI por erro de storage
     });
+  }, [pontos]);
+
+  // Garante flush ao ir para background (fechar app)
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background" || state === "inactive") {
+        AsyncStorage.setItem(PONTOS_KEY, String(pontos)).catch(() => {});
+      }
+    });
+    return () => sub.remove();
   }, [pontos]);
 
   const alternarTema = async () => {

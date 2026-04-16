@@ -30,8 +30,12 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Início",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
@@ -39,8 +43,25 @@ export default function TabLayout() {
         name="objetivo" // Certifique-se que o arquivo app/(tabs)/objetivo.tsx existe
         options={{
           title: "Metas",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="locate" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "trophy" : "trophy-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="loja"
+        options={{
+          title: "Loja",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "bag-handle" : "bag-handle-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />

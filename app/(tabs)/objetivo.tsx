@@ -9,6 +9,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Alert,
+  AppState,
   FlatList,
   Modal,
   Pressable,
@@ -47,6 +48,12 @@ const formatarData = (iso: string) =>
     minute: "2-digit",
   });
 
+const formatarDataBr = (isoDate: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate;
+  const [ano, mes, dia] = isoDate.split("-");
+  return `${dia}/${mes}/${ano}`;
+};
+
 const hojeString = () => new Date().toDateString();
 
 function parseNumber(texto: string): number {
@@ -80,6 +87,7 @@ export default function ObjetivosScreen() {
     metas,
     setMetas,
     criarMeta,
+    editarMeta,
     excluirMeta,
     carregandoMetas,
     setMetaAtivaId,
@@ -101,7 +109,9 @@ export default function ObjetivosScreen() {
   const [valorMovInput, setValorMovInput] = useState<Record<string, string>>({});
   const [historico, setHistorico] = useState<HistoricoItem[]>([]);
   const [abrirModalCriar, setAbrirModalCriar] = useState(false);
+  const [abrirModalEditar, setAbrirModalEditar] = useState(false);
   const [abrirModalHistorico, setAbrirModalHistorico] = useState(false);
+  const [metaEditando, setMetaEditando] = useState<Meta | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [, setTicker] = useState(0);
   const piggyScaleCard = useRef(new Animated.Value(0.9)).current;
@@ -143,10 +153,22 @@ export default function ObjetivosScreen() {
     carregarHistorico();
   }, []);
 
-  const salvarHistorico = async (next: HistoricoItem[]) => {
-    setHistorico(next);
-    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-  };
+  // Persistência robusta do histórico (salva em mudanças e ao fechar app)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(historico)).catch(() => {});
+    }, 250);
+    return () => clearTimeout(t);
+  }, [historico]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background" || state === "inactive") {
+        AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(historico)).catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, [historico]);
 
   const registrarMovimentacao = async (
     item: Omit<HistoricoItem, "id" | "dataIso">,
@@ -156,11 +178,25 @@ export default function ObjetivosScreen() {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       dataIso: new Date().toISOString(),
     };
-    await salvarHistorico([registro, ...historico]);
+    setHistorico((prev) => {
+      const next = [registro, ...prev];
+      AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
   };
 
   const metasView = useMemo(() => {
-    return [...metas].sort((a, b) => (b.dataCriacao > a.dataCriacao ? 1 : -1)).map(toMetaView);
+    const views = [...metas]
+      .sort((a, b) => (b.dataCriacao > a.dataCriacao ? 1 : -1))
+      .map(toMetaView);
+
+    // Metas concluídas no final (UX)
+    return views.sort((a, b) => {
+      const aDone = a.status === "concluida" ? 1 : 0;
+      const bDone = b.status === "concluida" ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone; // não concluídas primeiro
+      return b.dataCriacao > a.dataCriacao ? 1 : -1;
+    });
   }, [metas]);
 
   const totalGuardado = metas.reduce((acc, m) => acc + m.valorAtual, 0);
@@ -224,6 +260,50 @@ export default function ObjetivosScreen() {
       setDataPrazoInput("");
     } catch (e: any) {
       Alert.alert("Erro ao criar meta", e?.message ?? "Não foi possível criar a meta.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const abrirEditarMeta = (meta: Meta) => {
+    setMetaEditando(meta);
+    setNomeNovaMeta(meta.nome);
+    setValorMetaInput(String(meta.valorMeta));
+    setDataPrazoInput(meta.dataPrazo);
+    setAbrirModalEditar(true);
+  };
+
+  const salvarEdicaoMeta = async () => {
+    if (!metaEditando) return;
+    if (!nomeNovaMeta.trim()) {
+      Alert.alert("Nome obrigatório", "Digite um nome para a meta.");
+      return;
+    }
+    const valorMeta = parseNumber(valorMetaInput);
+    if (!Number.isFinite(valorMeta) || valorMeta <= 0) {
+      Alert.alert("Valor inválido", "Digite um valor de meta válido.");
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataPrazoInput.trim())) {
+      Alert.alert("Prazo inválido", "Use o formato YYYY-MM-DD.");
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      await editarMeta({
+        ...metaEditando,
+        nome: nomeNovaMeta.trim(),
+        valorMeta,
+        dataPrazo: dataPrazoInput.trim(),
+      });
+      setAbrirModalEditar(false);
+      setMetaEditando(null);
+      setNomeNovaMeta("");
+      setValorMetaInput("");
+      setDataPrazoInput("");
+    } catch (e: any) {
+      Alert.alert("Erro ao editar meta", e?.message ?? "Não foi possível salvar a meta.");
     } finally {
       setSalvando(false);
     }
@@ -315,7 +395,7 @@ export default function ObjetivosScreen() {
           <View style={styles.heroCircle1} />
           <View style={styles.heroCircle2} />
           <View style={styles.heroTopRow}>
-            <View>
+            <View style={styles.heroLeft}>
               <Text style={styles.headerTitulo}>Metas</Text>
               <Text style={styles.headerSubtitulo}>Organize e acompanhe suas metas financeiras</Text>
             </View>
@@ -376,17 +456,23 @@ export default function ObjetivosScreen() {
           <View
             style={[
               styles.metasListContainer,
-              { maxHeight: Math.min(560, Math.max(280, Math.round(screenHeight * 0.48))) },
+              { maxHeight: Math.min(720, Math.max(360, Math.round(screenHeight * 0.62))) },
             ]}
           >
             <FlatList
               data={metasView}
               keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator
+              persistentScrollbar
+              indicatorStyle={isDark ? "white" : "black"}
               nestedScrollEnabled
+              style={styles.metasList}
               contentContainerStyle={styles.metasListContent}
-              renderItem={({ item: meta }) => {
+              renderItem={({ item: meta, index }) => {
                 const expandida = meta.id === metaExpandidaId;
+                const comecouConcluidas =
+                  meta.status === "concluida" &&
+                  (index === 0 || metasView[index - 1]?.status !== "concluida");
                 const statusLabel =
                   meta.status === "concluida"
                     ? "Concluída"
@@ -395,64 +481,125 @@ export default function ObjetivosScreen() {
                       : "Em andamento";
 
                 return (
-                  <Pressable
-                    onPress={() => {
-                      setMetaExpandidaId((prev) => (prev === meta.id ? null : meta.id));
-                      setMetaAtivaId(meta.id);
-                    }}
-                    style={[
-                      styles.metaCard,
-                      { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
-                      expandida && styles.metaCardAtiva,
-                      meta.status === "vencida" && styles.metaCardVencida,
-                    ]}
-                  >
-                    <View style={styles.metaTop}>
+                  <View>
+                    {comecouConcluidas && (
+                      <View style={styles.concluidasDivider}>
+                        <View style={styles.concluidasLine} />
+                        <Text
+                          style={[
+                            styles.concluidasLabel,
+                            { color: theme.textMuted },
+                          ]}
+                        >
+                          Concluídas
+                        </Text>
+                        <View style={styles.concluidasLine} />
+                      </View>
+                    )}
+
+                    <View
+                      style={[
+                        styles.metaCard,
+                        { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+                        expandida && styles.metaCardAtiva,
+                        meta.status === "vencida" && styles.metaCardVencida,
+                        meta.status === "concluida" && styles.metaCardConcluida,
+                      ]}
+                    >
+                    <View style={styles.metaHeader}>
                       <View style={[styles.piggyWrap, { backgroundColor: theme.piggyBg }]}>
-                        <Piggy scaleAnim={piggyScaleCard} chapeuEquipado={chapeuEquipado || null} />
+                        <Piggy
+                          scaleAnim={piggyScaleCard}
+                          chapeuEquipado={meta.chapeuEquipadoId ?? chapeuEquipado ?? null}
+                        />
                       </View>
-                      <View
-                        style={[
-                          styles.statusTag,
-                          meta.status === "concluida"
-                            ? styles.statusConcluida
-                            : meta.status === "vencida"
-                              ? styles.statusVencida
-                              : styles.statusAndamento,
-                        ]}
+
+                      <View style={styles.metaInfoCol}>
+                        <Text style={[styles.metaNome, { color: theme.textPrimary }]} numberOfLines={2}>
+                          {meta.nome}
+                        </Text>
+
+                        <View style={styles.metaBadgeRow}>
+                          <View
+                            style={[
+                              styles.statusTag,
+                              meta.status === "concluida"
+                                ? styles.statusConcluida
+                                : meta.status === "vencida"
+                                  ? styles.statusVencida
+                                  : styles.statusAndamento,
+                            ]}
+                          >
+                            <Text style={styles.statusText}>{statusLabel}</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.metaPrazo, { color: theme.textMuted }]}>
+                          Prazo: {formatarDataBr(meta.dataPrazo)}
+                        </Text>
+                      </View>
+
+                      <Pressable
+                        onPress={() =>
+                          Alert.alert("Ações", `O que deseja fazer com "${meta.nome}"?`, [
+                            { text: "Cancelar", style: "cancel" },
+                            { text: "Editar", onPress: () => abrirEditarMeta(meta) },
+                            { text: "Excluir", style: "destructive", onPress: () => removerMeta(meta) },
+                          ])
+                        }
+                        style={[styles.moreBtn, { backgroundColor: isDark ? "#0F172A" : "#F8FAFC" }]}
                       >
-                        <Text style={styles.statusText}>{statusLabel}</Text>
+                        <Text style={[styles.moreBtnText, { color: theme.textPrimary }]}>⋯</Text>
+                      </Pressable>
+                    </View>
+
+                    <View style={styles.metaProgressBlock}>
+                      <View style={styles.progressTopRow}>
+                        <Text
+                          style={[styles.progressTopText, { color: theme.textMuted }]}
+                          numberOfLines={1}
+                        >
+                          {formatarMoeda(meta.valorAtual)} / {formatarMoeda(meta.valorMeta)}
+                        </Text>
+                        <Text style={[styles.progressTopPct, { color: theme.textMuted }]}>
+                          {Math.round(meta.progresso)}%
+                        </Text>
+                      </View>
+                      <View style={styles.barraFundo}>
+                        <View style={[styles.barraPreenchida, { width: `${Math.round(meta.progresso)}%` }]} />
                       </View>
                     </View>
 
-                    <Text style={[styles.metaNome, { color: theme.textPrimary }]}>{meta.nome}</Text>
-                    <Text style={[styles.metaValores, { color: theme.textMuted }]}>
-                      {formatarMoeda(meta.valorAtual)} / {formatarMoeda(meta.valorMeta)}
-                    </Text>
-                    <View style={styles.barraFundo}>
-                      <View style={[styles.barraPreenchida, { width: `${Math.round(meta.progresso)}%` }]} />
-                    </View>
-                    <Text style={[styles.metaPct, { color: theme.textMuted }]}>
-                      {Math.round(meta.progresso)}% concluído
-                    </Text>
-
-                    <View style={[styles.planCard, { backgroundColor: theme.planBg }]}>
-                      <Text style={[styles.planTitle, { color: theme.textPrimary }]}>
-                        Plano Original x Ajustado
-                      </Text>
-                      <Text style={[styles.planLine, { color: theme.textMuted }]}>
-                        Diária: {formatarMoeda(meta.planoOriginal.diario)} | {formatarMoeda(meta.planoAjustado.diario)}
-                      </Text>
-                      <Text style={[styles.planLine, { color: theme.textMuted }]}>
-                        Semanal: {formatarMoeda(meta.planoOriginal.semanal)} | {formatarMoeda(meta.planoAjustado.semanal)}
-                      </Text>
-                      <Text style={[styles.planLine, { color: theme.textMuted }]}>
-                        Mensal: {formatarMoeda(meta.planoOriginal.mensal)} | {formatarMoeda(meta.planoAjustado.mensal)}
-                      </Text>
+                    <View style={styles.cardFooterRow}>
+                      <Pressable
+                        onPress={() => {
+                          setMetaExpandidaId((prev) => (prev === meta.id ? null : meta.id));
+                          setMetaAtivaId(meta.id);
+                        }}
+                        style={[styles.expandToggleBtn, { backgroundColor: isDark ? "#0F172A" : "#F8FAFC" }]}
+                      >
+                        <Text style={[styles.expandToggleText, { color: theme.textPrimary }]}>
+                          {expandida ? "Ocultar ações" : "Abrir ações"}
+                        </Text>
+                      </Pressable>
                     </View>
 
                     {expandida && (
                       <View style={styles.expandArea}>
+                        <View style={[styles.planCard, { backgroundColor: theme.planBg }]}>
+                          <Text style={[styles.planTitle, { color: theme.textPrimary }]}>
+                            Plano Original x Ajustado
+                          </Text>
+                          <Text style={[styles.planLine, { color: theme.textMuted }]}>
+                            Diária: {formatarMoeda(meta.planoOriginal.diario)} | {formatarMoeda(meta.planoAjustado.diario)}
+                          </Text>
+                          <Text style={[styles.planLine, { color: theme.textMuted }]}>
+                            Semanal: {formatarMoeda(meta.planoOriginal.semanal)} | {formatarMoeda(meta.planoAjustado.semanal)}
+                          </Text>
+                          <Text style={[styles.planLine, { color: theme.textMuted }]}>
+                            Mensal: {formatarMoeda(meta.planoOriginal.mensal)} | {formatarMoeda(meta.planoAjustado.mensal)}
+                          </Text>
+                        </View>
+
                         <TextInput
                           style={[
                             styles.input,
@@ -495,7 +642,8 @@ export default function ObjetivosScreen() {
                         </Pressable>
                       </View>
                     )}
-                  </Pressable>
+                    </View>
+                  </View>
                 );
               }}
             />
@@ -503,7 +651,9 @@ export default function ObjetivosScreen() {
         )}
 
         <View style={styles.historicoCabecalho}>
-          <Text style={styles.secaoTitulo}>Atividades recentes</Text>
+          <Text style={[styles.secaoTitulo, { color: theme.textPrimary }]}>
+            Histórico
+          </Text>
           <Pressable onPress={() => setAbrirModalHistorico(true)}>
             <Text style={styles.verTudo}>Ver tudo</Text>
           </Pressable>
@@ -584,6 +734,45 @@ export default function ObjetivosScreen() {
         </View>
       </Modal>
 
+      <Modal visible={abrirModalEditar} animationType="slide" transparent onRequestClose={() => setAbrirModalEditar(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
+            <Text style={[styles.secaoTitulo, { color: theme.textPrimary }]}>Editar meta</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
+              placeholder="Nome da meta"
+              placeholderTextColor={theme.textMuted}
+              value={nomeNovaMeta}
+              onChangeText={setNomeNovaMeta}
+            />
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
+              placeholder="Valor total desejado"
+              placeholderTextColor={theme.textMuted}
+              keyboardType="decimal-pad"
+              value={valorMetaInput}
+              onChangeText={setValorMetaInput}
+            />
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
+              placeholder="Prazo (YYYY-MM-DD)"
+              placeholderTextColor={theme.textMuted}
+              value={dataPrazoInput}
+              onChangeText={setDataPrazoInput}
+              autoCapitalize="none"
+            />
+            <View style={styles.actionsRow}>
+              <Pressable style={[styles.btnSecundario, styles.flex1, { backgroundColor: theme.secondaryBtnBg }]} onPress={() => setAbrirModalEditar(false)}>
+                <Text style={styles.btnSecundarioTexto}>Cancelar</Text>
+              </Pressable>
+              <Pressable style={[styles.btnPrincipal, styles.flex1]} onPress={salvarEdicaoMeta} disabled={salvando}>
+                <Text style={styles.btnPrincipalTexto}>Salvar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={abrirModalHistorico} animationType="fade" transparent onRequestClose={() => setAbrirModalHistorico(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalBox, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
@@ -657,6 +846,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 28,
   },
+  heroLeft: { flex: 1, paddingRight: 12 },
   heroRightColumn: { alignItems: "flex-end", gap: 8 },
   headerTitulo: { color: "#fff", fontSize: 30, fontWeight: "700" },
   streakBadge: {
@@ -738,42 +928,87 @@ const styles = StyleSheet.create({
   },
   emptyEmoji: { fontSize: 42, marginBottom: 8 },
   vazioTitulo: { color: "#111827", fontSize: 16, fontWeight: "700" },
-  metasListContainer: { paddingHorizontal: 20, marginTop: 12 },
-  metasListContent: { gap: 14, paddingBottom: 6 },
+  metasListContainer: {
+    marginHorizontal: 20,
+    marginTop: 10,
+  },
+  metasList: { paddingRight: 2 },
+  metasListContent: { gap: 12, paddingBottom: 12 },
   metaCard: {
     backgroundColor: "#fff",
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    padding: 16,
-    minHeight: 220,
+    padding: 14,
+    minHeight: 192,
+    gap: 10,
   },
+  metaCardConcluida: { opacity: 0.92 },
   metaCardAtiva: { borderColor: BRAND_LIGHT, shadowColor: BRAND_LIGHT, shadowOpacity: 0.18, shadowRadius: 10, elevation: 4 },
   metaCardVencida: { borderColor: "#EF4444", backgroundColor: "#FEF2F2" },
-  metaTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  metaHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  metaInfoCol: { flex: 1, gap: 4 },
   piggyWrap: {
-    width: 140,
-    height: 128,
-    borderRadius: 20,
+    width: 112,
+    height: 110,
+    borderRadius: 14,
     backgroundColor: "#F5EDFF",
     alignItems: "center",
     justifyContent: "center",
+    paddingTop: 18,
+    marginTop: 2,
     overflow: "visible",
   },
+  moreBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+  },
+  moreBtnText: { fontSize: 18, fontWeight: "700", lineHeight: 18, marginTop: -4 },
+  metaBadgeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
   statusTag: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   statusAndamento: { backgroundColor: "#EFF6FF" },
   statusConcluida: { backgroundColor: "#ECFDF5" },
   statusVencida: { backgroundColor: "#FEE2E2" },
   statusText: { fontWeight: "700", fontSize: 11, color: "#1F2937" },
-  metaNome: { color: "#111827", fontWeight: "800", fontSize: 18, marginTop: 12 },
-  metaValores: { color: "#64748B", marginTop: 6, marginBottom: 8, fontSize: 13 },
+  pctBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  pctBadgeText: { color: BRAND_MID, fontWeight: "800", fontSize: 12 },
+  metaNome: { color: "#111827", fontWeight: "800", fontSize: 16, lineHeight: 20 },
+  metaPrazo: { fontSize: 11, fontWeight: "600" },
+  metaProgressBlock: { gap: 8 },
+  progressTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  progressTopText: { fontSize: 12, fontWeight: "700", flex: 1, paddingRight: 10 },
+  progressTopPct: { fontSize: 11, fontWeight: "700" },
   barraFundo: { height: 8, backgroundColor: "#E2E8F0", borderRadius: 999, overflow: "hidden" },
   barraPreenchida: { height: "100%", backgroundColor: BRAND_LIGHT },
-  metaPct: { marginTop: 7, color: "#64748B", fontSize: 12, fontWeight: "600" },
-  planCard: { backgroundColor: "#F8FAFC", borderRadius: 12, padding: 10, marginTop: 10 },
+  cardFooterRow: { flexDirection: "row", justifyContent: "flex-end" },
+  expandToggleBtn: {
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: "center",
+  },
+  expandToggleText: { fontSize: 12, fontWeight: "700" },
+  planCard: { backgroundColor: "#F8FAFC", borderRadius: 12, padding: 10 },
   planTitle: { fontSize: 12, color: "#334155", fontWeight: "700", marginBottom: 4 },
   planLine: { fontSize: 12, color: "#475569", marginTop: 2 },
-  expandArea: { marginTop: 12, gap: 10 },
+  expandArea: { gap: 10 },
+  concluidasDivider: {
+    marginTop: 14,
+    marginBottom: 6,
+    paddingHorizontal: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  concluidasLine: { flex: 1, height: 1, backgroundColor: "#CBD5E1", opacity: 0.6 },
+  concluidasLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 0.6, textTransform: "uppercase" },
   input: {
     borderWidth: 1,
     borderColor: "#CBD5E1",

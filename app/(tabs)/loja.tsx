@@ -1,6 +1,6 @@
 // app/loja.tsx ─── Loja de itens para o porquinho
 import { useSaldo } from "@/app/_layout";
-import { useRouter } from "expo-router";
+import { saveMetas } from "@/storage/metaStorage";
 import React, { useState } from "react";
 import {
   Modal,
@@ -212,7 +212,6 @@ function ProdutoCard({
 // ─── Tela da Loja ─────────────────────────────────────────────────────────────
 
 export default function LojaScreen() {
-  const router = useRouter();
   const {
     pontos,
     setPontos,
@@ -220,6 +219,8 @@ export default function LojaScreen() {
     setChapeusComprados,
     chapeuEquipado,
     setChapeuEquipado,
+    metas,
+    setMetas,
     setRecuperadoresOfensiva,
     isDark,
     alternarTema,
@@ -227,6 +228,7 @@ export default function LojaScreen() {
 
   const [categoriaAtiva, setCategoriaAtiva] = useState<string>("todos");
   const [modalItem, setModalItem] = useState<Produto | null>(null);
+  const [modalMetaParaAplicar, setModalMetaParaAplicar] = useState<Produto | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // ── Filtro ────────────────────────────────────────────────────────────────
@@ -241,6 +243,14 @@ export default function LojaScreen() {
     setTimeout(() => setToastMsg(null), 2500);
   };
 
+  const aplicarChapeuNaMeta = async (produtoId: string, metaId: string) => {
+    const nextMetas = metas.map((meta) =>
+      meta.id === metaId ? { ...meta, chapeuEquipadoId: produtoId } : meta,
+    );
+    setMetas(nextMetas);
+    await saveMetas(nextMetas);
+  };
+
   const confirmarCompra = (produto: Produto) => {
     // AVISO DE PONTOS INSUFICIENTES
     if (pontos < produto.preco) {
@@ -253,8 +263,12 @@ export default function LojaScreen() {
 
     if (produto.categoria === "chapeu") {
       setChapeusComprados((prev) => [...prev, produto.id]);
-      setChapeuEquipado(produto.id);
-      mostrarToast(`${produto.emoji} ${produto.nome} equipado!`);
+      if (metas.length === 0) {
+        setChapeuEquipado(produto.id);
+        mostrarToast(`${produto.emoji} ${produto.nome} comprado! Crie uma meta para aplicar.`);
+      } else {
+        setModalMetaParaAplicar(produto);
+      }
     } else if (produto.categoria === "recuperador") {
       const qtd = produto.id === "rec_3" ? 3 : 1;
       setRecuperadoresOfensiva((prev: number) => prev + qtd);
@@ -266,17 +280,12 @@ export default function LojaScreen() {
     setModalItem(null);
   };
 
-  const equipar = (id: string) => {
-    setChapeuEquipado(id);
-    mostrarToast("✨ Chapéu equipado com sucesso!");
-  };
-
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/");
+  const equipar = (produto: Produto) => {
+    if (metas.length === 0) {
+      mostrarToast("Crie uma meta antes de aplicar acessórios.");
+      return;
     }
+    setModalMetaParaAplicar(produto);
   };
 
   return (
@@ -286,9 +295,6 @@ export default function LojaScreen() {
         <View style={styles.heroCircle2} />
         {/* ── Header ── */}
         <View style={styles.header}>
-          <Pressable style={styles.backBtn} onPress={handleBack}>
-            <Text style={[styles.backBtnText, isDark && { color: "#FFFFFF" }]}>← Voltar</Text>
-          </Pressable>
           <View>
             <Text style={styles.headerTitle}>Loja</Text>
             <Text style={styles.headerSub}>Gaste seus pontos com sabedoria</Text>
@@ -349,7 +355,7 @@ export default function LojaScreen() {
               equipado={chapeuEquipado === produto.id}
               podeComprar={pontos >= produto.preco}
               onComprar={() => setModalItem(produto)}
-              onEquipar={() => equipar(produto.id)}
+              onEquipar={() => equipar(produto)}
               isDark={isDark}
             />
           ))}
@@ -416,6 +422,51 @@ export default function LojaScreen() {
         </Pressable>
       </Modal>
 
+      <Modal
+        visible={!!modalMetaParaAplicar}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalMetaParaAplicar(null)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalMetaParaAplicar(null)}
+        >
+          <View style={[styles.modalBox, isDark && { backgroundColor: "#1E293B", borderColor: "#334155" }]}>
+            <Text style={[styles.modalNome, isDark && { color: "#F8FAFC" }]}>
+              Aplicar em qual porquinho?
+            </Text>
+            <View style={styles.metaPickList}>
+              {metas.map((meta) => (
+                <Pressable
+                  key={meta.id}
+                  style={[styles.metaPickItem, isDark && { backgroundColor: "#0F172A", borderColor: "#334155" }]}
+                  onPress={async () => {
+                    if (!modalMetaParaAplicar) return;
+                    await aplicarChapeuNaMeta(modalMetaParaAplicar.id, meta.id);
+                    setChapeuEquipado(modalMetaParaAplicar.id);
+                    mostrarToast(`${modalMetaParaAplicar.emoji} aplicado em "${meta.nome}"`);
+                    setModalMetaParaAplicar(null);
+                  }}
+                >
+                  <Text style={[styles.metaPickNome, isDark && { color: "#F8FAFC" }]}>{meta.nome}</Text>
+                  <Text style={[styles.metaPickValor, isDark && { color: "#94A3B8" }]}>
+                    {meta.valorAtual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /{" "}
+                    {meta.valorMeta.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable
+              style={[styles.modalBtnCancelar, { marginTop: 10 }]}
+              onPress={() => setModalMetaParaAplicar(null)}
+            >
+              <Text style={styles.modalBtnCancelarText}>Fechar</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
       {/* ── Toast com estilo de erro condicional ── */}
       {toastMsg && (
         <View
@@ -469,32 +520,23 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
   heroRightColumn: { alignItems: "flex-end", gap: 8 },
-  backBtn: {
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  backBtnText: { color: "#FFFFFF", fontWeight: "600", fontSize: 13 },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: "800",
     color: "#FFFFFF",
-    textAlign: "center",
+    textAlign: "left",
   },
   headerSub: {
-    fontSize: 11,
+    fontSize: 12,
     color: "rgba(255,255,255,0.7)",
-    textAlign: "center",
+    textAlign: "left",
   },
   themeBtn: {
     alignSelf: "flex-end",
@@ -743,4 +785,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
   },
+  metaPickList: { width: "100%", gap: 8, marginTop: 10 },
+  metaPickItem: {
+    borderWidth: 1,
+    borderColor: COR.cardBorder,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#F8FAFC",
+  },
+  metaPickNome: { fontSize: 14, fontWeight: "700", color: COR.text },
+  metaPickValor: { fontSize: 12, color: COR.textMuted, marginTop: 2 },
 });

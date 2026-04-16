@@ -252,7 +252,7 @@ export default function HomeScreen() {
                   isDark={isDark}
                   onPress={() => router.push("/objetivo")}
                   piggyScale={piggyScaleCard}
-                  chapeuEquipado={chapeuEquipado}
+                  chapeuEquipado={item.chapeuEquipadoId ?? chapeuEquipado}
                 />
               )}
             />
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 17, fontWeight: "800", letterSpacing: -0.2 },
   sectionLink: { fontSize: 13, color: BRAND_LIGHT, fontWeight: "600" },
-  carouselList: { paddingRight: 20, gap: 12 },
+  carouselList: { paddingRight: 20, paddingBottom: 14, gap: 12 },
   carouselCard: {
     width: 220,
     borderRadius: 20,
@@ -504,6 +504,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     overflow: "visible",
+    marginBottom: 6,
   },
   carouselPiggyWrap: {
     height: 132,

@@ -8,6 +8,7 @@ export interface Meta {
   dataPrazo: string;     //ISO (YYYY-MM-DD)
   dataCriacao: string;
   emoji?: string;
+  chapeuEquipadoId?: string | null;
 
   planoOriginal: Plano;  //Salvo na criação (RF02)
 }
